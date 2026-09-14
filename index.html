@@ -498,6 +498,7 @@
       <input type="file" accept=".csv" id="impPacientesFile">
       <div class="modal-sub" id="impPacientesInfo" style="margin:10px 0 0;"></div>
       <div class="modal-actions">
+        <button class="btn btn-eliminar" id="btnVaciarPacientes">Vaciar base de pacientes</button>
         <button class="btn btn-primary" id="impPacientesBtn" disabled>Importar pacientes</button>
       </div>
     </div>
@@ -1375,6 +1376,30 @@ async function importarEnLotes(coleccion, filas){
     await lote.commit();
   }
 }
+
+async function vaciarColeccion(coleccion){
+  const CHUNK = 400;
+  let snap = await db.collection(coleccion).limit(CHUNK).get();
+  let total = 0;
+  while(!snap.empty){
+    const lote = db.batch();
+    snap.docs.forEach(d=> lote.delete(d.ref));
+    await lote.commit();
+    total += snap.size;
+    snap = await db.collection(coleccion).limit(CHUNK).get();
+  }
+  return total;
+}
+
+document.getElementById('btnVaciarPacientes').onclick = async ()=>{
+  if(!confirm("Esto borra TODOS los pacientes de la base, sin excepción. No se puede deshacer. ¿Confirmás que querés vaciarla?")) return;
+  if(!confirm("Confirmá una vez más: se van a eliminar todos los pacientes para volver a importarlos. ¿Seguimos?")) return;
+  document.getElementById('btnVaciarPacientes').disabled = true;
+  document.getElementById('impPacientesInfo').textContent = "Borrando pacientes…";
+  const total = await vaciarColeccion('pacientes');
+  document.getElementById('impPacientesInfo').textContent = `Se borraron ${total} pacientes. Ya podés importar el CSV de nuevo.`;
+  document.getElementById('btnVaciarPacientes').disabled = false;
+};
 
 let impPacientesRows = [];
 document.getElementById('impPacientesFile').addEventListener('change', (e)=>{
