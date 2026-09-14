@@ -145,9 +145,6 @@
     border-radius:8px;font-size:16px;line-height:1;font-weight:700;
   }
   .addbtn:hover{background:#eef1ff;}
-  .pmethods{display:flex;gap:6px;flex-wrap:wrap;}
-  .pmethod{border:1px solid var(--border);padding:7px 12px;border-radius:8px;font-size:11.5px;font-weight:600;background:#fcfcfd;}
-  .pmethod.active{background:var(--accent);color:#fff;border-color:var(--accent);}
   .currency-toggle{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;width:fit-content;}
   .currency-toggle button{border:none;background:#fcfcfd;padding:8px 18px;font-size:12.5px;font-weight:600;}
   .currency-toggle button.active{background:var(--accent);color:#fff;}
@@ -219,6 +216,39 @@
   .gate-card h2{margin:0 0 8px;font-size:16px;font-weight:700;}
   .gate-card p{margin:0 0 18px;font-size:12px;color:var(--muted);line-height:1.5;}
   .gate-card .btn-primary{padding:10px 22px;}
+
+  .pacientes-scroll{
+    display:flex;gap:12px;overflow-x:auto;padding:8px 2px 16px;
+  }
+  .paciente-card{
+    flex:0 0 220px;border:1px solid var(--border);border-radius:12px;
+    padding:14px;background:#fafafc;
+  }
+  .paciente-card .field{margin-bottom:10px;}
+  .paciente-card label{font-size:9.5px;}
+  .paciente-card input{padding:7px 9px;font-size:11.5px;}
+
+  .pago-row{display:flex;gap:8px;margin-bottom:8px;align-items:center;}
+  .pago-row input{flex:1;min-width:0;}
+  .pago-row select{flex:1;min-width:0;}
+  .pago-row .btn-quitar{
+    flex:none;width:32px;height:34px;border:1px solid var(--border);background:#fff;
+    border-radius:8px;color:#c62828;font-size:14px;
+  }
+  .pago-row .btn-quitar:hover{background:#fdeeee;}
+  .badges-cell{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;white-space:normal !important;}
+
+  .caja-row{
+    border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;
+    display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  }
+  .caja-row .cr-info{display:flex;flex-direction:column;gap:2px;}
+  .caja-row .cr-info .nom{font-weight:700;font-size:12.5px;}
+  .caja-row .cr-info .det{font-size:11px;color:var(--muted);}
+  .caja-row .cr-montos{display:flex;gap:16px;font-size:12px;}
+  .caja-row .cr-montos div{text-align:center;}
+  .caja-row .cr-montos .lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;}
+  .badge-abierta{background:#eef1ff;color:#4842c9;}
 </style>
 </head>
 <body>
@@ -255,11 +285,13 @@
   </div>
   <div class="actions">
     <button class="btn col-hidden" id="btnCierre">Cerrar caja</button>
+    <button class="btn" id="btnPacientes">Pacientes</button>
     <button class="btn btn-deudores" id="btnDeudores">Deudores <span class="badge-count col-hidden" id="deudoresCount">0</span></button>
     <button class="btn" id="btnReporteDiario">Reporte diario</button>
     <button class="btn" id="btnPagoProfesional">Calcular pago profesional</button>
     <button class="btn col-hidden" id="btnInformes">Informes</button>
     <button class="btn col-hidden" id="btnImportar">Importar catálogo</button>
+    <button class="btn col-hidden" id="btnCajas">Cajas</button>
     <button class="btn btn-primary" id="btnNuevo">+ Nuevo movimiento</button>
     <button class="btn" id="btnLogout">Salir</button>
   </div>
@@ -428,14 +460,9 @@
     </div>
 
     <div class="field">
-      <label>Medio de pago</label>
-      <div class="pmethods" id="pmethods">
-        <button type="button" class="pmethod" data-m="efectivo">Efectivo</button>
-        <button type="button" class="pmethod" data-m="mp">Mercado Pago</button>
-        <button type="button" class="pmethod" data-m="tarjeta">Tarjeta</button>
-        <button type="button" class="pmethod" data-m="transferencia">Transferencia</button>
-        <button type="button" class="pmethod" data-m="debe">Debe</button>
-      </div>
+      <label>Pagos <span class="opt">(si no llega al total, la diferencia queda como deuda)</span></label>
+      <div id="pagosLista"></div>
+      <button type="button" class="btn" id="btnAgregarPago" style="margin-top:4px;">+ Agregar pago</button>
     </div>
 
     <div class="modal-actions between" id="modalAcciones">
@@ -482,6 +509,40 @@
   </div>
 </div>
 
+<!-- ============ MODAL: CAJAS (admin) ============ -->
+<div class="overlay" id="overlayCajas">
+  <div class="modal wide">
+    <button class="close-x" id="closeCajas">✕</button>
+    <h2>Cajas</h2>
+    <div class="modal-sub">Aperturas y cierres registrados, por recepcionista.</div>
+    <div class="mes-selector" id="mesSelectorCajas" style="margin:0 0 16px;">
+      <button id="mesCajasPrev" title="Mes anterior">◀</button>
+      <span id="mesCajasLabel"></span>
+      <button id="mesCajasNext" title="Mes siguiente">▶</button>
+    </div>
+    <div id="cajasLista"></div>
+    <div class="modal-actions">
+      <button class="btn" id="cerrarCajas">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: PACIENTES (buscar y editar) ============ -->
+<div class="overlay" id="overlayPacientes">
+  <div class="modal" style="max-width:1100px;">
+    <button class="close-x" id="closePacientes">✕</button>
+    <h2>Pacientes</h2>
+    <div class="modal-sub">Buscá por apellido o nombre para ver y editar sus datos.</div>
+    <div class="field">
+      <input type="text" id="buscarPacienteInput" placeholder="Buscar por apellido o nombre…" autocomplete="off">
+    </div>
+    <div class="pacientes-scroll" id="pacientesScroll"></div>
+    <div class="modal-actions">
+      <button class="btn" id="cerrarPacientes">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ MODAL: IMPORTAR CATÁLOGO (admin) ============ -->
 <div class="overlay" id="overlayImportar">
   <div class="modal wide">
@@ -499,6 +560,7 @@
       <div class="modal-sub" id="impPacientesInfo" style="margin:10px 0 0;"></div>
       <div class="modal-actions">
         <button class="btn btn-eliminar" id="btnVaciarPacientes">Vaciar base de pacientes</button>
+        <button class="btn" id="btnCorregirFechas">Corregir fechas guardadas como número</button>
         <button class="btn btn-primary" id="impPacientesBtn" disabled>Importar pacientes</button>
       </div>
     </div>
@@ -514,6 +576,15 @@
       <div class="modal-actions">
         <button class="btn btn-primary" id="impConceptosBtn" disabled>Importar catálogo</button>
       </div>
+    </div>
+
+    <div class="subcard">
+      <h3>Mantenimiento</h3>
+      <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">
+        Convierte los movimientos viejos (de antes del sistema de pagos múltiples) al formato nuevo, para que sigan apareciendo bien en Deudores y en los reportes.
+      </p>
+      <div class="modal-sub" id="migrarPagosInfo" style="margin:0 0 10px;"></div>
+      <button class="btn" id="btnMigrarPagos">Migrar movimientos al nuevo formato de pagos</button>
     </div>
 
     <div class="modal-actions">
@@ -582,6 +653,16 @@ let movimientosDeuda = [];    // espejo local de todas las deudas pendientes, de
 let cajaActual = null;        // doc de la sesión de caja abierta (o null)
 let ultimoCierre = null;      // último cierre registrado (para sugerir la próxima apertura)
 
+function excelSerialToISODate(valor){
+  const n = Number(valor);
+  // Excel guarda las fechas como un número de días desde el 30/12/1899.
+  // Solo lo tratamos como fecha si es un número entero "razonable" (entre 1900 y 2100 aprox).
+  if(!valor || isNaN(n) || !/^\d+$/.test(String(valor).trim()) || n < 1 || n > 73000) return valor;
+  const ms = Math.round((n - 25569) * 86400 * 1000);
+  const d = new Date(ms);
+  return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,'0')+"-"+String(d.getUTCDate()).padStart(2,'0');
+}
+
 function hoyISO(){
   const d = new Date();
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,'0')+"-"+String(d.getDate()).padStart(2,'0');
@@ -594,17 +675,41 @@ function fmtTotal(m){
   const pref = m.moneda==="USD" ? "US$ " : "$";
   return pref + Number(m.valor).toLocaleString('es-AR');
 }
-function medioDisplayText(m){
-  if(m.medio==="debe") return m.saldada ? "Saldado" : "Debe";
-  return MEDIO_LABELS[m.medio] ? MEDIO_LABELS[m.medio](m) : m.medio;
+function fmtMonto(valor, moneda){
+  const pref = moneda==="USD" ? "US$ " : "$";
+  return pref + Number(valor).toLocaleString('es-AR');
 }
-function medioBadge(m){
-  if(m.medio==="debe"){
-    if(m.saldada) return `<span class="badge badge-saldado">Saldado el ${m.fechaSaldadoDisplay}</span>`;
-    return `<span class="badge badge-debe">Debe</span>`;
-  }
-  const label = MEDIO_LABELS[m.medio] ? MEDIO_LABELS[m.medio](m) : m.medio;
-  return `<span class="badge badge-${m.medio}">${label}</span>`;
+// Devuelve el array de pagos de un movimiento, con compatibilidad para
+// movimientos viejos que todavía tienen un solo medio/valor a nivel raíz
+// (antes de que existiera el reparto en varios pagos).
+function pagosDe(m){
+  if(m.pagos && m.pagos.length) return m.pagos;
+  if(m.medio) return [{medio: m.medio, valor: m.valor, saldada: !!m.saldada, fechaSaldadoISO: m.fechaSaldadoISO||null, fechaSaldadoDisplay: m.fechaSaldadoDisplay||null}];
+  return [];
+}
+function medioLabelDe(medio, moneda){
+  return MEDIO_LABELS[medio] ? MEDIO_LABELS[medio]({moneda}) : medio;
+}
+function medioDisplayText(m){
+  return pagosDe(m).map(p=>{
+    if(p.medio==="debe") return p.saldada ? "Saldado" : "Debe";
+    return medioLabelDe(p.medio, m.moneda);
+  }).join(', ');
+}
+function medioBadgesHTML(m){
+  const pagos = pagosDe(m);
+  const varios = pagos.length > 1;
+  return pagos.map(p=>{
+    const montoTxt = varios ? ` ${fmtMonto(p.valor, m.moneda)}` : "";
+    if(p.medio==="debe"){
+      if(p.saldada) return `<span class="badge badge-saldado">Saldado el ${p.fechaSaldadoDisplay}${montoTxt}</span>`;
+      return `<span class="badge badge-debe">Debe${montoTxt}</span>`;
+    }
+    return `<span class="badge badge-${p.medio}">${medioLabelDe(p.medio, m.moneda)}${montoTxt}</span>`;
+  }).join('');
+}
+function tieneDeudaPendiente(pagos){
+  return pagos.some(p=>p.medio==="debe" && !p.saldada);
 }
 
 /* =====================================================================
@@ -689,6 +794,7 @@ function aplicarRolUI(){
   document.getElementById('cajaHint').classList.toggle('col-hidden', esAdmin);
   document.getElementById('btnInformes').classList.toggle('col-hidden', !esAdmin);
   document.getElementById('btnImportar').classList.toggle('col-hidden', !esAdmin);
+  document.getElementById('btnCajas').classList.toggle('col-hidden', !esAdmin);
 }
 
 /* =====================================================================
@@ -709,7 +815,9 @@ function suscribirMovimientos(){
 function iniciarListeners(){
   // Pacientes
   unsubPacientes = db.collection('pacientes').orderBy('apellido').onSnapshot(snap=>{
-    pacienteRegistry = snap.docs.map(d=> d.data().nombreCompleto);
+    pacientesFullList = snap.docs.map(d=> ({id:d.id, ...d.data()}));
+    pacienteRegistry = pacientesFullList.map(p=> p.nombreCompleto);
+    if(overlayPacientes.classList.contains('show')) renderPacientesBusqueda();
   });
 
   // Catálogo de profesionales/conceptos (con su código)
@@ -735,8 +843,16 @@ function iniciarListeners(){
   });
 
   // Deudas pendientes, de cualquier fecha — para el botón Deudores
-  unsubDeuda = db.collection('movimientos').where('medio','==','debe').onSnapshot(snap=>{
-    movimientosDeuda = snap.docs.map(d=> ({id:d.id, ...d.data()})).filter(m=>!m.saldada);
+  unsubDeuda = db.collection('movimientos').where('tieneDeudaPendiente','==',true).onSnapshot(snap=>{
+    movimientosDeuda = [];
+    snap.docs.forEach(d=>{
+      const m = {id:d.id, ...d.data()};
+      pagosDe(m).forEach((p, idx)=>{
+        if(p.medio==="debe" && !p.saldada){
+          movimientosDeuda.push({movId:m.id, idx, pac:m.pac, concepto:m.concepto, notas:m.notas, fechaDisplay:m.fechaDisplay, moneda:m.moneda, valor:p.valor});
+        }
+      });
+    });
     renderDeudoresCount();
   });
 
@@ -771,7 +887,9 @@ function attachAutocomplete(input, getOptions, onPick){
   const dd = document.createElement('div');
   dd.className = 'ac-dropdown';
   wrap.appendChild(dd);
+  let suppressOpen = false;
   function renderList(){
+    if(suppressOpen){ suppressOpen = false; return; }
     const q = input.value.trim().toLowerCase();
     const opts = getOptions().filter(o=> !q || o.toLowerCase().includes(q));
     dd.innerHTML = opts.length
@@ -786,6 +904,7 @@ function attachAutocomplete(input, getOptions, onPick){
     if(!opt) return;
     input.value = opt.textContent;
     dd.classList.remove('show');
+    suppressOpen = true;
     input.dispatchEvent(new Event('input', {bubbles:true}));
     if(onPick) onPick(opt.textContent);
   });
@@ -836,7 +955,7 @@ function renderTabla(){
       <td class="concepto">${m.concepto}</td>
       <td class="notas">${m.notas||""}</td>
       <td class="total ${esGasto?'gasto':''}">${fmtTotal(m)}</td>
-      <td>${medioBadge(m)}</td>
+      <td class="badges-cell">${medioBadgesHTML(m)}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -851,10 +970,12 @@ document.getElementById('fechaModal').textContent = new Date().toLocaleDateStrin
 
 function calcularEsperadoCaja(){
   if(!cajaActual) return 0;
-  const hoy = hoyISO();
   let ingresos = 0, egresos = 0;
-  movimientosHoy.filter(m=>m.medio==="efectivo" && m.moneda==="$").forEach(m=>{
-    if(m.prof === "GASTOS") egresos += m.valor; else ingresos += m.valor;
+  movimientosHoy.forEach(m=>{
+    if(m.moneda !== "$") return;
+    pagosDe(m).filter(p=>p.medio==="efectivo").forEach(p=>{
+      if(m.prof === "GASTOS") egresos += p.valor; else ingresos += p.valor;
+    });
   });
   return cajaActual.aperturaMonto + ingresos - egresos;
 }
@@ -874,10 +995,12 @@ function actualizarEstadoCaja(){
     return;
   }
   if(cajaActual){
+    const esQuienAbrio = cajaActual.recepcionista === currentUser.nombre;
     el.classList.remove('closed');
-    el.querySelector('span').innerHTML = `Caja abierta — Recepción: <strong>${currentUser.nombre}</strong> · Apertura: $${cajaActual.aperturaMonto.toLocaleString('es-AR')}`;
+    el.querySelector('span').innerHTML = `Caja abierta — Recepción: <strong>${cajaActual.recepcionista}</strong> · Apertura: $${cajaActual.aperturaMonto.toLocaleString('es-AR')}`;
     btn.textContent = "Cerrar caja";
-    hint.textContent = "";
+    btn.disabled = !esQuienAbrio;
+    hint.textContent = esQuienAbrio ? "" : `La caja la abrió ${cajaActual.recepcionista} — solo ella puede cerrarla desde su usuario.`;
     btnNuevo.disabled = false;
     gate.classList.remove('show');
     content.classList.remove('panel-blur');
@@ -887,6 +1010,7 @@ function actualizarEstadoCaja(){
       ? `Caja cerrada — último cierre: $${ultimoCierre.toLocaleString('es-AR')}`
       : "Caja cerrada — todavía no hay ningún cierre registrado";
     btn.textContent = "Abrir caja";
+    btn.disabled = false;
     hint.textContent = "Abrí la caja para poder cargar movimientos.";
     btnNuevo.disabled = true;
     gate.classList.add('show');
@@ -897,7 +1021,15 @@ document.getElementById('btnAbrirDesdeGate').onclick = abrirModalApertura;
 
 
 document.getElementById('btnCierre').onclick = ()=>{
-  if(cajaActual){ abrirModalCierre(); } else { abrirModalApertura(); }
+  if(cajaActual){
+    if(cajaActual.recepcionista !== currentUser.nombre){
+      alert(`La caja la abrió ${cajaActual.recepcionista}. Solo ella puede cerrarla desde su usuario.`);
+      return;
+    }
+    abrirModalCierre();
+  } else {
+    abrirModalApertura();
+  }
 };
 
 const overlayApertura = document.getElementById('overlayApertura');
@@ -984,7 +1116,48 @@ const btnEliminar = document.getElementById('btnEliminar');
 let modo = 'nuevo';
 let editingId = null;
 let monedaSel = "$";
-let medioSel = null;
+
+const MEDIO_OPCIONES = [
+  {value:"efectivo", label:"Efectivo"},
+  {value:"mp", label:"Mercado Pago"},
+  {value:"tarjeta", label:"Tarjeta"},
+  {value:"transferencia", label:"Transferencia"},
+  {value:"debe", label:"Debe"},
+];
+function opcionesMedioHTML(seleccion){
+  return '<option value="">Medio…</option>' + MEDIO_OPCIONES.map(o=>
+    `<option value="${o.value}" ${o.value===seleccion?"selected":""}>${o.label}</option>`
+  ).join('');
+}
+function agregarFilaPago(monto, medio){
+  const row = document.createElement('div');
+  row.className = 'pago-row';
+  row.innerHTML = `
+    <input type="text" class="pago-monto" inputmode="numeric" placeholder="Monto">
+    <select class="pago-medio">${opcionesMedioHTML(medio||"")}</select>
+    <button type="button" class="btn-quitar" title="Quitar">✕</button>
+  `;
+  const inp = row.querySelector('.pago-monto');
+  inp.value = monto ? Number(monto).toLocaleString('es-AR') : "";
+  inp.addEventListener('input', ()=>{
+    let raw = inp.value.replace(/\D/g,"");
+    inp.value = raw ? Number(raw).toLocaleString('es-AR') : "";
+  });
+  row.querySelector('.btn-quitar').onclick = ()=> row.remove();
+  document.getElementById('pagosLista').appendChild(row);
+}
+document.getElementById('btnAgregarPago').onclick = ()=> agregarFilaPago();
+agregarFilaPago();
+
+function leerPagosForm(){
+  const pagos = [];
+  document.querySelectorAll('#pagosLista .pago-row').forEach(row=>{
+    const monto = Number(row.querySelector('.pago-monto').value.replace(/\D/g,""));
+    const medio = row.querySelector('.pago-medio').value;
+    if(monto>0 && medio) pagos.push({medio, valor: monto, saldada:false, fechaSaldadoISO:null, fechaSaldadoDisplay:null});
+  });
+  return pagos;
+}
 
 function poblarProfesionalesUI(){
   const actual = selProfesional.value;
@@ -1032,10 +1205,8 @@ function abrirEdicion(id){
   document.querySelector(`.currency-toggle button[data-cur="${m.moneda}"]`).classList.add('active');
   monedaSel = m.moneda;
 
-  document.querySelectorAll('.pmethod').forEach(b=>b.classList.remove('active'));
-  const pbtn = document.querySelector(`.pmethod[data-m="${m.medio}"]`);
-  if(pbtn) pbtn.classList.add('active');
-  medioSel = m.medio;
+  document.getElementById('pagosLista').innerHTML = "";
+  pagosDe(m).forEach(p=> agregarFilaPago(p.valor, p.medio));
 
   inpValor.value = Number(m.valor).toLocaleString('es-AR');
   overlay.classList.add('show');
@@ -1055,8 +1226,8 @@ function resetModal(){
   document.querySelectorAll('.currency-toggle button').forEach(b=>b.classList.remove('active'));
   document.querySelector('.currency-toggle button[data-cur="$"]').classList.add('active');
   monedaSel = "$";
-  document.querySelectorAll('.pmethod').forEach(b=>b.classList.remove('active'));
-  medioSel = null;
+  document.getElementById('pagosLista').innerHTML = "";
+  agregarFilaPago();
   document.getElementById('cardNuevoPaciente').classList.add('col-hidden');
   document.getElementById('deudasPacienteBox').classList.add('col-hidden');
   document.getElementById('deudasPacienteLista').innerHTML = "";
@@ -1100,15 +1271,15 @@ selPaciente.addEventListener('input', refreshDeudasPaciente);
 function refreshDeudasPaciente(){
   const box = document.getElementById('deudasPacienteBox');
   const lista = document.getElementById('deudasPacienteLista');
-  const pendientes = movimientosDeuda.filter(m=>m.pac===selPaciente.value && m.id!==editingId);
+  const pendientes = movimientosDeuda.filter(d=>d.pac===selPaciente.value && d.movId!==editingId);
   if(!selPaciente.value || !pendientes.length){
     box.classList.add('col-hidden'); lista.innerHTML=""; return;
   }
   box.classList.remove('col-hidden');
-  lista.innerHTML = pendientes.map(m=>`
+  lista.innerHTML = pendientes.map(d=>`
     <div class="deuda-mini">
-      <label><input type="radio" name="saldarDeuda" value="${m.id}"> Saldar "${m.concepto}" del ${m.fechaDisplay} — ${fmtTotal(m)}</label>
-      ${m.notas ? `<div class="det">${m.notas}</div>` : ""}
+      <label><input type="radio" name="saldarDeuda" value="${d.movId}::${d.idx}"> Saldar "${d.concepto}" del ${d.fechaDisplay} — ${fmtMonto(d.valor, d.moneda)}</label>
+      ${d.notas ? `<div class="det">${d.notas}</div>` : ""}
     </div>
   `).join('');
 }
@@ -1124,13 +1295,7 @@ inpValor.addEventListener('input', ()=>{
   let raw = inpValor.value.replace(/\D/g,"");
   inpValor.value = raw ? Number(raw).toLocaleString('es-AR') : "";
 });
-document.querySelectorAll('.pmethod').forEach(btn=>{
-  btn.onclick = ()=>{
-    document.querySelectorAll('.pmethod').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    medioSel = btn.dataset.m;
-  };
-});
+
 
 btnGuardarMov.onclick = async ()=>{
   if(!selPaciente.value){ alert("Elegí un paciente/alumno."); return; }
@@ -1138,38 +1303,63 @@ btnGuardarMov.onclick = async ()=>{
   if(!selConcepto.value){ alert("Elegí un concepto."); return; }
   const valorNum = Number(inpValor.value.replace(/\D/g,""));
   if(!valorNum){ alert("Ingresá un total."); return; }
-  if(!medioSel){ alert("Elegí un medio de pago."); return; }
-  if(selProfesional.value === "GASTOS" && medioSel === "debe"){ alert('Un gasto no puede quedar como "Debe".'); return; }
+
+  let pagos = leerPagosForm();
+  const sumaPagos = pagos.reduce((a,p)=>a+p.valor,0);
+  if(sumaPagos > valorNum){
+    alert(`La suma de los pagos cargados (${fmtMonto(sumaPagos, monedaSel)}) supera el total (${fmtMonto(valorNum, monedaSel)}). Corregí los montos.`);
+    return;
+  }
+  if(sumaPagos < valorNum){
+    pagos.push({medio:"debe", valor: valorNum - sumaPagos, saldada:false, fechaSaldadoISO:null, fechaSaldadoDisplay:null});
+  }
+  if(selProfesional.value === "GASTOS" && pagos.some(p=>p.medio==="debe")){
+    alert('Un gasto no puede quedar como "Debe" — revisá que los pagos cubran el total completo.');
+    return;
+  }
 
   const radioSaldar = document.querySelector('input[name="saldarDeuda"]:checked');
   const fechaISO = hoyISO();
   const fechaDisplay = isoToDisplay(fechaISO);
   const codigo = CODIGO_POR_CONCEPTO[selProfesional.value+"||"+selConcepto.value] || "";
+  const pendienteDeuda = tieneDeudaPendiente(pagos);
 
   if(modo==='editar'){
     if(!confirm("¿Está seguro de editar este registro? Esta opción no tiene vuelta atrás.")) return;
-    const original = movimientos.find(x=>x.id===editingId);
     const cambios = {
       pac: selPaciente.value, prof: selProfesional.value, concepto: selConcepto.value, codigo,
       notas: document.getElementById('inpNotas').value, moneda: monedaSel, valor: valorNum,
-      medio: medioSel, actualizadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+      pagos, tieneDeudaPendiente: pendienteDeuda,
+      actualizadoEn: firebase.firestore.FieldValue.serverTimestamp(),
     };
-    if(original && original.medio !== medioSel){ cambios.saldada = false; cambios.fechaSaldadoISO = null; cambios.fechaSaldadoDisplay = null; }
     await db.collection('movimientos').doc(editingId).update(cambios);
   } else {
     await db.collection('movimientos').add({
       fechaISO, fechaDisplay, pac: selPaciente.value, prof: selProfesional.value,
       concepto: selConcepto.value, codigo, notas: document.getElementById('inpNotas').value,
-      moneda: monedaSel, valor: valorNum, medio: medioSel,
-      saldada: false, fechaSaldadoISO: null, fechaSaldadoDisplay: null,
+      moneda: monedaSel, valor: valorNum, pagos, tieneDeudaPendiente: pendienteDeuda,
       creadoPor: currentUser.nombre, creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
     });
   }
 
   if(radioSaldar){
-    await db.collection('movimientos').doc(radioSaldar.value).update({
-      saldada: true, fechaSaldadoISO: fechaISO, fechaSaldadoDisplay: fechaDisplay,
-    });
+    const [movId, idxStr] = radioSaldar.value.split('::');
+    const idx = Number(idxStr);
+    const ref = db.collection('movimientos').doc(movId);
+    const snap = await ref.get();
+    if(snap.exists){
+      const md = snap.data();
+      const pagosDeuda = pagosDe(md).slice();
+      if(pagosDeuda[idx]){
+        pagosDeuda[idx] = {...pagosDeuda[idx], saldada:true, fechaSaldadoISO:fechaISO, fechaSaldadoDisplay:fechaDisplay};
+        await ref.update({
+          pagos: pagosDeuda, tieneDeudaPendiente: tieneDeudaPendiente(pagosDeuda),
+          // por compatibilidad con datos viejos que todavía miran estos campos sueltos:
+          saldada: !tieneDeudaPendiente(pagosDeuda) ? true : (md.saldada||false),
+          fechaSaldadoISO: pagosDeuda[idx].fechaSaldadoISO, fechaSaldadoDisplay: pagosDeuda[idx].fechaSaldadoDisplay,
+        });
+      }
+    }
   }
 
   cerrarModal();
@@ -1391,6 +1581,64 @@ async function vaciarColeccion(coleccion){
   return total;
 }
 
+document.getElementById('btnCorregirFechas').onclick = async ()=>{
+  if(!confirm("Esto revisa todos los pacientes y convierte las fechas de nacimiento que hayan quedado guardadas como número de Excel a una fecha real. ¿Continuamos?")) return;
+  document.getElementById('btnCorregirFechas').disabled = true;
+  document.getElementById('impPacientesInfo').textContent = "Revisando pacientes…";
+
+  const snap = await db.collection('pacientes').get();
+  const CHUNK = 400;
+  let corregidos = 0;
+  let pendientes = [];
+  snap.docs.forEach(d=>{
+    const fnac = d.data().fnac;
+    if(fnac && /^\d+$/.test(String(fnac).trim())){
+      const nueva = excelSerialToISODate(fnac);
+      if(nueva !== fnac){ pendientes.push({ref: d.ref, fnac: nueva}); }
+    }
+  });
+  for(let i=0; i<pendientes.length; i+=CHUNK){
+    const lote = db.batch();
+    pendientes.slice(i, i+CHUNK).forEach(p=> lote.update(p.ref, {fnac: p.fnac}));
+    await lote.commit();
+    corregidos += Math.min(CHUNK, pendientes.length - i);
+  }
+
+  document.getElementById('impPacientesInfo').textContent = corregidos
+    ? `Se corrigieron ${corregidos} fechas de nacimiento.`
+    : "No encontré fechas guardadas como número — ya está todo bien.";
+  document.getElementById('btnCorregirFechas').disabled = false;
+};
+
+document.getElementById('btnMigrarPagos').onclick = async ()=>{
+  if(!confirm("Esto revisa todos los movimientos y les agrega el nuevo campo de pagos si todavía no lo tienen. No cambia montos ni medios. ¿Continuamos?")) return;
+  document.getElementById('btnMigrarPagos').disabled = true;
+  document.getElementById('migrarPagosInfo').textContent = "Revisando movimientos…";
+  try{
+    const snap = await db.collection('movimientos').get();
+    const CHUNK = 400;
+    const pendientes = [];
+    snap.docs.forEach(d=>{
+      const m = d.data();
+      if(!m.pagos){
+        const pagos = pagosDe(m);
+        pendientes.push({ref: d.ref, pagos, tieneDeudaPendiente: tieneDeudaPendiente(pagos)});
+      }
+    });
+    for(let i=0; i<pendientes.length; i+=CHUNK){
+      const lote = db.batch();
+      pendientes.slice(i, i+CHUNK).forEach(p=> lote.update(p.ref, {pagos: p.pagos, tieneDeudaPendiente: p.tieneDeudaPendiente}));
+      await lote.commit();
+    }
+    document.getElementById('migrarPagosInfo').textContent = pendientes.length
+      ? `Se migraron ${pendientes.length} movimientos.`
+      : "No había movimientos para migrar — ya está todo al día.";
+  }catch(e){
+    document.getElementById('migrarPagosInfo').textContent = "Error: " + e.message;
+  }
+  document.getElementById('btnMigrarPagos').disabled = false;
+};
+
 document.getElementById('btnVaciarPacientes').onclick = async ()=>{
   if(!confirm("Esto borra TODOS los pacientes de la base, sin excepción. No se puede deshacer. ¿Confirmás que querés vaciarla?")) return;
   if(!confirm("Confirmá una vez más: se van a eliminar todos los pacientes para volver a importarlos. ¿Seguimos?")) return;
@@ -1413,7 +1661,7 @@ document.getElementById('impPacientesFile').addEventListener('change', (e)=>{
         nombre: (r.Nombre||r.nombre||"").trim(),
         telefono: (r.Telefono||r["Teléfono"]||r.telefono||"").trim(),
         email: (r.Email||r.email||"").trim(),
-        fnac: (r.FechaNacimiento||r.fechaNacimiento||"").trim(),
+        fnac: excelSerialToISODate((r.FechaNacimiento||r.fechaNacimiento||"").trim()),
         dni: (r.DNI||r.dni||"").trim(),
         medioLlegada: (r.MedioLlegada||r.medioLlegada||"").trim(),
       })).filter(r=>r.apellido && r.nombre);
@@ -1428,13 +1676,18 @@ document.getElementById('impPacientesBtn').onclick = async ()=>{
   if(!impPacientesRows.length) return;
   if(!confirm(`¿Importar ${impPacientesRows.length} pacientes? Esta acción no se puede deshacer.`)) return;
   document.getElementById('impPacientesBtn').disabled = true;
-  await importarEnLotes('pacientes', impPacientesRows.map(r=>({
-    apellido: r.apellido.toUpperCase(), nombre: r.nombre,
-    nombreCompleto: `${r.apellido.toUpperCase()}, ${r.nombre}`,
-    telefono: r.telefono, email: r.email, fnac: r.fnac, dni: r.dni, medioLlegada: r.medioLlegada,
-    creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
-  })));
-  document.getElementById('impPacientesInfo').textContent = "¡Listo! Pacientes importados.";
+  try{
+    await importarEnLotes('pacientes', impPacientesRows.map(r=>({
+      apellido: r.apellido.toUpperCase(), nombre: r.nombre,
+      nombreCompleto: `${r.apellido.toUpperCase()}, ${r.nombre}`,
+      telefono: r.telefono, email: r.email, fnac: r.fnac, dni: r.dni, medioLlegada: r.medioLlegada,
+      creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+    })));
+    document.getElementById('impPacientesInfo').textContent = "¡Listo! Pacientes importados.";
+  }catch(e){
+    document.getElementById('impPacientesInfo').textContent = "Error al importar: " + e.message;
+    document.getElementById('impPacientesBtn').disabled = false;
+  }
 };
 
 let impConceptosRows = [];
@@ -1460,9 +1713,158 @@ document.getElementById('impConceptosBtn').onclick = async ()=>{
   if(!impConceptosRows.length) return;
   if(!confirm(`¿Importar ${impConceptosRows.length} conceptos? Esta acción no se puede deshacer.`)) return;
   document.getElementById('impConceptosBtn').disabled = true;
-  await importarEnLotes('conceptos', impConceptosRows);
-  document.getElementById('impConceptosInfo').textContent = "¡Listo! Catálogo importado.";
+  try{
+    await importarEnLotes('conceptos', impConceptosRows);
+    document.getElementById('impConceptosInfo').textContent = "¡Listo! Catálogo importado.";
+  }catch(e){
+    document.getElementById('impConceptosInfo').textContent = "Error al importar: " + e.message;
+    document.getElementById('impConceptosBtn').disabled = false;
+  }
 };
+
+/* =====================================================================
+   PANEL "CAJAS" (admin) — historial de apertura/cierre por mes
+   ===================================================================== */
+const overlayCajas = document.getElementById('overlayCajas');
+let mesCajas = { year: hoyRef.getFullYear(), month: hoyRef.getMonth()+1 };
+
+function mesCajasInicioISO(){ return `${mesCajas.year}-${String(mesCajas.month).padStart(2,'0')}-01`; }
+function mesCajasFinISO(){
+  let y = mesCajas.year, m = mesCajas.month + 1;
+  if(m>12){ m=1; y++; }
+  return `${y}-${String(m).padStart(2,'0')}-01`;
+}
+function actualizarMesCajasLabel(){
+  document.getElementById('mesCajasLabel').textContent = `${MESES[mesCajas.month-1]} ${mesCajas.year}`;
+  const esMesActualReal = mesCajas.year===hoyRef.getFullYear() && mesCajas.month===(hoyRef.getMonth()+1);
+  document.getElementById('mesCajasNext').disabled = esMesActualReal;
+}
+
+document.getElementById('btnCajas').onclick = ()=>{
+  mesCajas = { year: hoyRef.getFullYear(), month: hoyRef.getMonth()+1 };
+  actualizarMesCajasLabel();
+  cargarCajas();
+  overlayCajas.classList.add('show');
+};
+document.getElementById('closeCajas').onclick = ()=> overlayCajas.classList.remove('show');
+document.getElementById('cerrarCajas').onclick = ()=> overlayCajas.classList.remove('show');
+document.getElementById('mesCajasPrev').onclick = ()=>{
+  mesCajas.month--; if(mesCajas.month<1){ mesCajas.month=12; mesCajas.year--; }
+  actualizarMesCajasLabel(); cargarCajas();
+};
+document.getElementById('mesCajasNext').onclick = ()=>{
+  mesCajas.month++; if(mesCajas.month>12){ mesCajas.month=1; mesCajas.year++; }
+  actualizarMesCajasLabel(); cargarCajas();
+};
+
+async function cargarCajas(){
+  const cont = document.getElementById('cajasLista');
+  cont.innerHTML = '<div class="empty-state">Cargando…</div>';
+  try{
+    const snap = await db.collection('cajaSesiones')
+      .where('fechaISO','>=', mesCajasInicioISO())
+      .where('fechaISO','<', mesCajasFinISO())
+      .orderBy('fechaISO','desc')
+      .get();
+    if(snap.empty){ cont.innerHTML = '<div class="empty-state">No hay aperturas registradas este mes.</div>'; return; }
+    cont.innerHTML = snap.docs.map(d=>{
+      const c = d.data();
+      const horaApertura = c.abiertaEn ? c.abiertaEn.toDate().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : "—";
+      const horaCierre = c.cerradaEn ? c.cerradaEn.toDate().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : null;
+      let badge;
+      if(!c.cerradaEn){
+        badge = `<span class="badge badge-abierta">Caja abierta</span>`;
+      } else if(c.diferencia === 0){
+        badge = `<span class="badge badge-efectivo">Coincide</span>`;
+      } else {
+        const signo = c.diferencia>0 ? "de más" : "de menos";
+        badge = `<span class="badge badge-debe">Diferencia $${Math.abs(c.diferencia).toLocaleString('es-AR')} ${signo}</span>`;
+      }
+      return `
+        <div class="caja-row">
+          <div class="cr-info">
+            <span class="nom">${isoToDisplay(c.fechaISO)} — ${c.recepcionista}</span>
+            <span class="det">Apertura ${horaApertura}${horaCierre ? " · Cierre " + horaCierre : ""}</span>
+          </div>
+          <div class="cr-montos">
+            <div><div class="lbl">Apertura</div>$${Number(c.aperturaMonto).toLocaleString('es-AR')}</div>
+            ${c.cerradaEn ? `
+              <div><div class="lbl">Esperado</div>$${Number(c.esperadoCierre).toLocaleString('es-AR')}</div>
+              <div><div class="lbl">Contado</div>$${Number(c.montoContado).toLocaleString('es-AR')}</div>
+            ` : ""}
+          </div>
+          ${badge}
+        </div>
+      `;
+    }).join('');
+  }catch(e){
+    cont.innerHTML = `<div class="empty-state">Error al cargar: ${e.message}</div>`;
+  }
+}
+
+/* =====================================================================
+   PANEL "PACIENTES" (buscar y editar, para ambos roles)
+   ===================================================================== */
+let pacientesFullList = [];
+const overlayPacientes = document.getElementById('overlayPacientes');
+const buscarPacienteInput = document.getElementById('buscarPacienteInput');
+
+document.getElementById('btnPacientes').onclick = ()=>{
+  buscarPacienteInput.value = "";
+  document.getElementById('pacientesScroll').innerHTML = '<div class="empty-state">Escribí un apellido o nombre para buscar.</div>';
+  overlayPacientes.classList.add('show');
+  buscarPacienteInput.focus();
+};
+document.getElementById('closePacientes').onclick = ()=> overlayPacientes.classList.remove('show');
+document.getElementById('cerrarPacientes').onclick = ()=> overlayPacientes.classList.remove('show');
+buscarPacienteInput.addEventListener('input', renderPacientesBusqueda);
+
+function renderPacientesBusqueda(){
+  const q = buscarPacienteInput.value.trim().toLowerCase();
+  const cont = document.getElementById('pacientesScroll');
+  if(!q){ cont.innerHTML = '<div class="empty-state">Escribí un apellido o nombre para buscar.</div>'; return; }
+  const encontrados = pacientesFullList.filter(p=>
+    (p.apellido||"").toLowerCase().includes(q) || (p.nombre||"").toLowerCase().includes(q)
+  ).slice(0,60);
+  if(!encontrados.length){ cont.innerHTML = '<div class="empty-state">No encontré pacientes con ese nombre.</div>'; return; }
+  cont.innerHTML = encontrados.map(p=>`
+    <div class="paciente-card" data-id="${p.id}">
+      <div class="field"><label>Apellido</label><input type="text" class="pc-apellido" value="${p.apellido||""}"></div>
+      <div class="field"><label>Nombre</label><input type="text" class="pc-nombre" value="${p.nombre||""}"></div>
+      <div class="field"><label>Teléfono</label><input type="tel" class="pc-telefono" value="${p.telefono||""}"></div>
+      <div class="field"><label>Email</label><input type="email" class="pc-email" value="${p.email||""}"></div>
+      <div class="field"><label>Fecha nac.</label><input type="text" class="pc-fnac" value="${p.fnac||""}"></div>
+      <div class="field"><label>DNI</label><input type="text" class="pc-dni" value="${p.dni||""}"></div>
+      <div class="field"><label>Medio de llegada</label><input type="text" class="pc-medio" value="${p.medioLlegada||""}"></div>
+      <button class="btn btn-primary" style="width:100%;" onclick="guardarPacienteCard('${p.id}', this)">Guardar cambios</button>
+    </div>
+  `).join('');
+}
+
+async function guardarPacienteCard(id, btn){
+  const card = btn.closest('.paciente-card');
+  const apellido = card.querySelector('.pc-apellido').value.trim().toUpperCase();
+  const nombre = card.querySelector('.pc-nombre').value.trim();
+  if(!apellido || !nombre){ alert("Apellido y nombre son obligatorios."); return; }
+  const datos = {
+    apellido, nombre, nombreCompleto: `${apellido}, ${nombre}`,
+    telefono: card.querySelector('.pc-telefono').value.trim(),
+    email: card.querySelector('.pc-email').value.trim(),
+    fnac: card.querySelector('.pc-fnac').value.trim(),
+    dni: card.querySelector('.pc-dni').value.trim(),
+    medioLlegada: card.querySelector('.pc-medio').value.trim(),
+  };
+  btn.disabled = true; btn.textContent = "Guardando…";
+  try{
+    await db.collection('pacientes').doc(id).update(datos);
+    btn.textContent = "¡Guardado!";
+    setTimeout(()=>{ btn.textContent = "Guardar cambios"; btn.disabled = false; }, 1200);
+  }catch(e){
+    alert("No se pudo guardar: " + e.message);
+    btn.disabled = false; btn.textContent = "Guardar cambios";
+  }
+}
+window.guardarPacienteCard = guardarPacienteCard;
 </script>
 </body>
 </html>
