@@ -15,6 +15,7 @@
 <!-- PDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
 <style>
   :root{
@@ -258,6 +259,7 @@
     <button class="btn" id="btnReporteDiario">Reporte diario</button>
     <button class="btn" id="btnPagoProfesional">Calcular pago profesional</button>
     <button class="btn col-hidden" id="btnInformes">Informes</button>
+    <button class="btn col-hidden" id="btnImportar">Importar catálogo</button>
     <button class="btn btn-primary" id="btnNuevo">+ Nuevo movimiento</button>
     <button class="btn" id="btnLogout">Salir</button>
   </div>
@@ -375,7 +377,7 @@
         <div class="field"><label>Nombre *</label><input type="text" id="npNombre"></div>
       </div>
       <div class="row2">
-        <div class="field"><label>Teléfono *</label><input type="tel" id="npTelefono"></div>
+        <div class="field"><label>Teléfono <span class="opt">(opcional)</span></label><input type="tel" id="npTelefono"></div>
         <div class="field"><label>Email <span class="opt">(opcional)</span></label><input type="email" id="npEmail"></div>
       </div>
       <div class="row2">
@@ -480,6 +482,45 @@
   </div>
 </div>
 
+<!-- ============ MODAL: IMPORTAR CATÁLOGO (admin) ============ -->
+<div class="overlay" id="overlayImportar">
+  <div class="modal wide">
+    <button class="close-x" id="closeImportar">✕</button>
+    <h2>Importar catálogo</h2>
+    <div class="modal-sub">Subí un CSV para cada base. Esto agrega registros nuevos — no borra ni reemplaza los que ya existen.</div>
+
+    <div class="subcard">
+      <h3>Pacientes / alumnos</h3>
+      <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">
+        Columnas: <code>Apellido, Nombre, Telefono, Email, FechaNacimiento, DNI, MedioLlegada</code><br>
+        (Apellido y Nombre son obligatorios; Telefono es opcional)
+      </p>
+      <input type="file" accept=".csv" id="impPacientesFile">
+      <div class="modal-sub" id="impPacientesInfo" style="margin:10px 0 0;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="impPacientesBtn" disabled>Importar pacientes</button>
+      </div>
+    </div>
+
+    <div class="subcard">
+      <h3>Profesionales / Conceptos</h3>
+      <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">
+        Columnas: <code>Profesional, Concepto, Codigo</code><br>
+        (una fila por cada tratamiento o pack; para gastos, usá "GASTOS" como Profesional)
+      </p>
+      <input type="file" accept=".csv" id="impConceptosFile">
+      <div class="modal-sub" id="impConceptosInfo" style="margin:10px 0 0;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="impConceptosBtn" disabled>Importar catálogo</button>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" id="cerrarImportar">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ MODAL: INFORMES (admin) ============ -->
 <div class="overlay" id="overlayInformes">
   <div class="modal wide">
@@ -515,18 +556,14 @@ const db = firebase.firestore();
 
 /* =====================================================================
    CATÁLOGO DE PROFESIONALES / CONCEPTOS
-   Por ahora vive acá como catálogo fijo (igual que en el boceto).
-   Cuando Fede pase la base de tratamientos, la migramos a una colección
-   de Firestore editable en vez de este objeto.
+   Ahora vive en Firestore, colección "conceptos" — un doc por cada
+   concepto/tratamiento: { profesional, concepto, codigo }.
+   CONCEPTOS se arma en vivo agrupando esa colección por profesional.
+   Se carga vacío al principio: importá el catálogo con el botón
+   "Importar catálogo" (solo administradores) para completarlo.
    ===================================================================== */
-const PROFESIONALES = {
-  "INZEO, MARIANA": ["TRATAMIENTO", "ALQUILER CONSUL"],
-  "BIENESTAR": ["PACK DE 4 CLASES", "PACK DE 8 CLASES"],
-  "CURSOS Y TALLERES": ["Corazones de Cerámica · 3.ª edición"],
-  "CALABRO, VIRNA": ["CONSULTA", "CAJA DIARIA (retira honorarios)"],
-  "SUEROTERAPIA": ["SUERO BASE + Ampollas biológicas Heel®️ (Hasta 3)", "SUERO BASE + Ampollas biológicas Heel®️ (Hasta 3) BONIFICADO", "PROTOCOLO COMPLETO 6 SESIONES"],
-  "GASTOS": ["Alquiler", "Insumos", "Servicios", "Sueldos", "Otro egreso"],
-};
+let CONCEPTOS = {};              // { "SUEROTERAPIA": [{concepto, codigo}, ...], ... }
+let CODIGO_POR_CONCEPTO = {};    // "SUEROTERAPIA||SUERO BASE..." -> "SUE-01", para buscar el código al guardar
 
 const MEDIO_LABELS = {
   efectivo: (m)=> m.moneda==="USD" ? "Efectivo USD" : "Efectivo $",
@@ -588,7 +625,7 @@ function intentarLogin(){
 }
 document.getElementById('btnLogout').onclick = ()=> auth.signOut();
 
-let unsubMovimientos = null, unsubPacientes = null, unsubCajaAbierta = null, unsubHoy = null, unsubDeuda = null;
+let unsubMovimientos = null, unsubPacientes = null, unsubCajaAbierta = null, unsubHoy = null, unsubDeuda = null, unsubConceptos = null;
 
 auth.onAuthStateChanged(async (user)=>{
   if(!user){
@@ -599,6 +636,7 @@ auth.onAuthStateChanged(async (user)=>{
     if(unsubCajaAbierta) unsubCajaAbierta();
     if(unsubHoy) unsubHoy();
     if(unsubDeuda) unsubDeuda();
+    if(unsubConceptos) unsubConceptos();
     return;
   }
   const doc = await db.collection('usuarios').doc(user.uid).get();
@@ -649,6 +687,7 @@ function aplicarRolUI(){
   document.getElementById('cajaStatus').classList.toggle('col-hidden', esAdmin);
   document.getElementById('cajaHint').classList.toggle('col-hidden', esAdmin);
   document.getElementById('btnInformes').classList.toggle('col-hidden', !esAdmin);
+  document.getElementById('btnImportar').classList.toggle('col-hidden', !esAdmin);
 }
 
 /* =====================================================================
@@ -670,6 +709,19 @@ function iniciarListeners(){
   // Pacientes
   unsubPacientes = db.collection('pacientes').orderBy('apellido').onSnapshot(snap=>{
     pacienteRegistry = snap.docs.map(d=> d.data().nombreCompleto);
+  });
+
+  // Catálogo de profesionales/conceptos (con su código)
+  unsubConceptos = db.collection('conceptos').orderBy('profesional').onSnapshot(snap=>{
+    CONCEPTOS = {};
+    CODIGO_POR_CONCEPTO = {};
+    snap.docs.forEach(d=>{
+      const c = d.data();
+      if(!CONCEPTOS[c.profesional]) CONCEPTOS[c.profesional] = [];
+      CONCEPTOS[c.profesional].push({concepto: c.concepto, codigo: c.codigo||""});
+      CODIGO_POR_CONCEPTO[c.profesional+"||"+c.concepto] = c.codigo||"";
+    });
+    poblarProfesionalesUI();
   });
 
   // Movimientos del mes elegido (por defecto, el mes en curso)
@@ -747,7 +799,7 @@ const filtroMedio = document.getElementById('filtroMedio');
 
 attachAutocomplete(filtroFecha, ()=> [...new Set(movimientos.map(m=>m.fechaDisplay))].sort(compareFechas));
 attachAutocomplete(filtroPaciente, ()=> [...new Set(movimientos.map(m=>m.pac))].sort());
-attachAutocomplete(filtroProfesional, ()=> Object.keys(PROFESIONALES));
+attachAutocomplete(filtroProfesional, ()=> Object.keys(CONCEPTOS));
 attachAutocomplete(filtroConcepto, ()=> [...new Set(movimientos.map(m=>m.concepto))]);
 attachAutocomplete(filtroMedio, ()=> ["Efectivo","Mercado Pago","Tarjeta","Transferencia","Debe","Saldado"]);
 
@@ -779,7 +831,7 @@ function renderTabla(){
       <td>${m.fechaDisplay}</td>
       <td class="left">${m.pac}</td>
       <td>${m.prof}</td>
-      <td class="codigo">${m.id.slice(0,6)}</td>
+      <td class="codigo">${m.codigo||""}</td>
       <td class="concepto">${m.concepto}</td>
       <td class="notas">${m.notas||""}</td>
       <td class="total ${esGasto?'gasto':''}">${fmtTotal(m)}</td>
@@ -933,15 +985,19 @@ let editingId = null;
 let monedaSel = "$";
 let medioSel = null;
 
-selProfesional.innerHTML = '<option value="">Seleccionar…</option>' +
-  Object.keys(PROFESIONALES).map(p=>`<option>${p}</option>`).join('');
+function poblarProfesionalesUI(){
+  const actual = selProfesional.value;
+  selProfesional.innerHTML = '<option value="">Seleccionar…</option>' +
+    Object.keys(CONCEPTOS).sort().map(p=>`<option>${p}</option>`).join('');
+  if(Object.keys(CONCEPTOS).includes(actual)){ selProfesional.value = actual; selProfesional.onchange(); }
+}
 attachAutocomplete(selPaciente, ()=> pacienteRegistry);
 
 selProfesional.onchange = ()=>{
-  const opts = PROFESIONALES[selProfesional.value] || [];
+  const opts = CONCEPTOS[selProfesional.value] || [];
   if(opts.length){
     selConcepto.disabled = false;
-    selConcepto.innerHTML = opts.map(c=>`<option>${c}</option>`).join('');
+    selConcepto.innerHTML = opts.map(c=>`<option value="${c.concepto}">${c.concepto}${c.codigo ? " — " + c.codigo : ""}</option>`).join('');
   } else {
     selConcepto.disabled = true;
     selConcepto.innerHTML = '<option value="">Sin conceptos configurados</option>';
@@ -1023,7 +1079,7 @@ document.getElementById('guardarPaciente').onclick = async ()=>{
   const ape = document.getElementById('npApellido').value.trim();
   const nom = document.getElementById('npNombre').value.trim();
   const tel = document.getElementById('npTelefono').value.trim();
-  if(!ape || !nom || !tel){ alert("Apellido, nombre y teléfono son obligatorios."); return; }
+  if(!ape || !nom){ alert("Apellido y nombre son obligatorios."); return; }
   const nombreCompleto = `${ape.toUpperCase()}, ${nom}`;
   await db.collection('pacientes').add({
     apellido: ape.toUpperCase(), nombre: nom, nombreCompleto,
@@ -1087,12 +1143,13 @@ btnGuardarMov.onclick = async ()=>{
   const radioSaldar = document.querySelector('input[name="saldarDeuda"]:checked');
   const fechaISO = hoyISO();
   const fechaDisplay = isoToDisplay(fechaISO);
+  const codigo = CODIGO_POR_CONCEPTO[selProfesional.value+"||"+selConcepto.value] || "";
 
   if(modo==='editar'){
     if(!confirm("¿Está seguro de editar este registro? Esta opción no tiene vuelta atrás.")) return;
     const original = movimientos.find(x=>x.id===editingId);
     const cambios = {
-      pac: selPaciente.value, prof: selProfesional.value, concepto: selConcepto.value,
+      pac: selPaciente.value, prof: selProfesional.value, concepto: selConcepto.value, codigo,
       notas: document.getElementById('inpNotas').value, moneda: monedaSel, valor: valorNum,
       medio: medioSel, actualizadoEn: firebase.firestore.FieldValue.serverTimestamp(),
     };
@@ -1101,7 +1158,7 @@ btnGuardarMov.onclick = async ()=>{
   } else {
     await db.collection('movimientos').add({
       fechaISO, fechaDisplay, pac: selPaciente.value, prof: selProfesional.value,
-      concepto: selConcepto.value, notas: document.getElementById('inpNotas').value,
+      concepto: selConcepto.value, codigo, notas: document.getElementById('inpNotas').value,
       moneda: monedaSel, valor: valorNum, medio: medioSel,
       saldada: false, fechaSaldadoISO: null, fechaSaldadoDisplay: null,
       creadoPor: currentUser.nombre, creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
@@ -1197,7 +1254,7 @@ document.getElementById('btnReporteDiario').onclick = ()=>{
 const overlayPago = document.getElementById('overlayPago');
 const selProfesionalPago = document.getElementById('selProfesionalPago');
 let pagoMovsActuales = [];
-attachAutocomplete(selProfesionalPago, ()=> Object.keys(PROFESIONALES).filter(p=>p!=="GASTOS"));
+attachAutocomplete(selProfesionalPago, ()=> Object.keys(CONCEPTOS).filter(p=>p!=="GASTOS"));
 
 document.getElementById('btnPagoProfesional').onclick = ()=>{
   selProfesionalPago.value = "";
@@ -1288,6 +1345,99 @@ function renderInformes(){
     <div class="kpi"><div class="lbl">Deuda pendiente total</div><div class="val">$${deudaPendiente.toLocaleString('es-AR')}</div></div>
   `;
 }
+
+/* =====================================================================
+   IMPORTAR CATÁLOGO (admin) — pacientes y profesionales/conceptos vía CSV
+   ===================================================================== */
+const overlayImportar = document.getElementById('overlayImportar');
+document.getElementById('btnImportar').onclick = ()=>{
+  document.getElementById('impPacientesInfo').textContent = "";
+  document.getElementById('impPacientesFile').value = "";
+  document.getElementById('impPacientesBtn').disabled = true;
+  impPacientesRows = [];
+  document.getElementById('impConceptosInfo').textContent = "";
+  document.getElementById('impConceptosFile').value = "";
+  document.getElementById('impConceptosBtn').disabled = true;
+  impConceptosRows = [];
+  overlayImportar.classList.add('show');
+};
+document.getElementById('closeImportar').onclick = ()=> overlayImportar.classList.remove('show');
+document.getElementById('cerrarImportar').onclick = ()=> overlayImportar.classList.remove('show');
+
+async function importarEnLotes(coleccion, filas){
+  const CHUNK = 400;
+  for(let i=0; i<filas.length; i+=CHUNK){
+    const lote = db.batch();
+    filas.slice(i, i+CHUNK).forEach(dato=>{
+      const ref = db.collection(coleccion).doc();
+      lote.set(ref, dato);
+    });
+    await lote.commit();
+  }
+}
+
+let impPacientesRows = [];
+document.getElementById('impPacientesFile').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  Papa.parse(file, {
+    header:true, skipEmptyLines:true,
+    complete: (res)=>{
+      impPacientesRows = res.data.map(r=>({
+        apellido: (r.Apellido||r.apellido||"").trim(),
+        nombre: (r.Nombre||r.nombre||"").trim(),
+        telefono: (r.Telefono||r["Teléfono"]||r.telefono||"").trim(),
+        email: (r.Email||r.email||"").trim(),
+        fnac: (r.FechaNacimiento||r.fechaNacimiento||"").trim(),
+        dni: (r.DNI||r.dni||"").trim(),
+        medioLlegada: (r.MedioLlegada||r.medioLlegada||"").trim(),
+      })).filter(r=>r.apellido && r.nombre);
+      const invalidos = res.data.length - impPacientesRows.length;
+      document.getElementById('impPacientesInfo').textContent =
+        `${impPacientesRows.length} pacientes listos para importar` + (invalidos>0 ? ` (se ignoran ${invalidos} filas sin apellido/nombre)` : "");
+      document.getElementById('impPacientesBtn').disabled = impPacientesRows.length===0;
+    }
+  });
+});
+document.getElementById('impPacientesBtn').onclick = async ()=>{
+  if(!impPacientesRows.length) return;
+  if(!confirm(`¿Importar ${impPacientesRows.length} pacientes? Esta acción no se puede deshacer.`)) return;
+  document.getElementById('impPacientesBtn').disabled = true;
+  await importarEnLotes('pacientes', impPacientesRows.map(r=>({
+    apellido: r.apellido.toUpperCase(), nombre: r.nombre,
+    nombreCompleto: `${r.apellido.toUpperCase()}, ${r.nombre}`,
+    telefono: r.telefono, email: r.email, fnac: r.fnac, dni: r.dni, medioLlegada: r.medioLlegada,
+    creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+  })));
+  document.getElementById('impPacientesInfo').textContent = "¡Listo! Pacientes importados.";
+};
+
+let impConceptosRows = [];
+document.getElementById('impConceptosFile').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  Papa.parse(file, {
+    header:true, skipEmptyLines:true,
+    complete: (res)=>{
+      impConceptosRows = res.data.map(r=>({
+        profesional: (r.Profesional||r.profesional||"").trim(),
+        concepto: (r.Concepto||r.concepto||"").trim(),
+        codigo: (r.Codigo||r["Código"]||r.codigo||"").trim(),
+      })).filter(r=>r.profesional && r.concepto);
+      const invalidos = res.data.length - impConceptosRows.length;
+      document.getElementById('impConceptosInfo').textContent =
+        `${impConceptosRows.length} conceptos listos para importar` + (invalidos>0 ? ` (se ignoran ${invalidos} filas sin profesional/concepto)` : "");
+      document.getElementById('impConceptosBtn').disabled = impConceptosRows.length===0;
+    }
+  });
+});
+document.getElementById('impConceptosBtn').onclick = async ()=>{
+  if(!impConceptosRows.length) return;
+  if(!confirm(`¿Importar ${impConceptosRows.length} conceptos? Esta acción no se puede deshacer.`)) return;
+  document.getElementById('impConceptosBtn').disabled = true;
+  await importarEnLotes('conceptos', impConceptosRows);
+  document.getElementById('impConceptosInfo').textContent = "¡Listo! Catálogo importado.";
+};
 </script>
 </body>
 </html>
