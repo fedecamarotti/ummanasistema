@@ -1,0 +1,1899 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAJA UMMANA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Firebase (compat SDK) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<!-- PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+<style>
+  :root{
+    --border: #e7e7ea;
+    --text: #24262b;
+    --muted: #8a8d94;
+    --accent: #6f6af8;
+    --accent-dk: #5650d6;
+  }
+  *{box-sizing:border-box; font-family:'Montserrat', sans-serif;}
+  body{margin:0;background:#f4f5f7;color:var(--text);font-size:12px;}
+  .col-hidden{display:none !important;}
+  button{font-family:inherit;cursor:pointer;}
+
+  /* ---------- Login ---------- */
+  #loginScreen{
+    min-height:100vh;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,#f4f5f7,#ecebff);
+  }
+  .login-card{
+    background:#fff;border:1px solid var(--border);border-radius:16px;
+    padding:36px 34px;width:100%;max-width:360px;box-shadow:0 12px 40px rgba(20,20,30,0.08);
+  }
+  .login-card h1{font-size:18px;margin:0 0 4px;font-weight:700;}
+  .login-card .sub{font-size:12px;color:var(--muted);margin-bottom:22px;}
+  .login-card .field{margin-bottom:14px;}
+  .login-card label{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.3px;}
+  .login-card input{
+    width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;
+    font-size:13px;font-family:inherit;background:#fcfcfd;
+  }
+  .login-card input:focus{outline:none;border-color:var(--accent);background:#fff;}
+  .login-card .btn-primary{width:100%;padding:11px;margin-top:6px;font-size:13px;}
+  .login-error{
+    background:#fdeeee;border:1px solid #f3d3d3;color:#a13a3a;font-size:11.5px;
+    padding:9px 12px;border-radius:8px;margin-bottom:14px;
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    background:#fff;border-bottom:1px solid var(--border);padding:16px 28px;
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
+  }
+  .topbar h1{font-size:16px;margin:0;font-weight:700;letter-spacing:0.2px;}
+  .topbar .sub{font-size:11.5px;color:var(--muted);margin-top:2px;font-weight:500;}
+  .caja-status{
+    display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;
+    background:#eef1ff;border:1px solid #d9dcff;color:#4842c9;padding:6px 14px;border-radius:20px;
+  }
+  .caja-status .dot{width:7px;height:7px;border-radius:50%;background:#5650d6;}
+  .caja-status.closed{background:#fdeeee;border-color:#f3d3d3;color:#a13a3a;}
+  .caja-status.closed .dot{background:#c62828;}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;}
+  .btn{
+    border:1px solid var(--border);background:#fff;padding:8px 16px;border-radius:7px;
+    font-size:12.5px;font-weight:600;color:var(--text);
+  }
+  .btn:hover{background:#f4f4f6;}
+  .btn:disabled{opacity:0.45;cursor:not-allowed;}
+  .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .btn-primary:hover{background:var(--accent-dk);}
+  .btn-deudores{position:relative;}
+  .badge-count{
+    position:absolute;top:-6px;right:-6px;background:#e53935;color:#fff;
+    font-size:9.5px;font-weight:700;border-radius:20px;padding:1px 5px;line-height:1.3;
+  }
+
+  /* ---------- Sheet wrapper ---------- */
+  .sheet-wrap{
+    margin:22px 28px 40px;background:#fff;border:1px solid var(--border);border-radius:12px;
+    overflow:auto;box-shadow:0 1px 3px rgba(20,20,30,0.04);
+  }
+  table{border-collapse:collapse;width:100%;font-size:11px;min-width:900px;}
+  th,td{border-bottom:1px solid var(--border);padding:4px 9px;text-align:center;white-space:nowrap;line-height:1.2;}
+  td.left, th.left{text-align:left;}
+  thead th{
+    background:#fafafa;font-weight:700;font-size:9.5px;text-transform:uppercase;letter-spacing:0.4px;
+    color:var(--muted);padding:9px 9px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2;
+  }
+  .editcol{width:34px;padding:0;}
+  .editbtn{border:none;background:transparent;font-size:13px;padding:6px;color:#b5b7bd;border-radius:6px;}
+  .editbtn:hover{background:#f0f0f3;color:var(--accent);}
+  td.concepto{white-space:nowrap;font-size:10.5px;line-height:1.2;}
+  td.codigo{color:var(--muted);font-size:10px;}
+  td.notas{color:#5b5e66;font-size:10.5px;max-width:180px;white-space:normal;}
+  td.total{font-weight:700;font-size:11px;}
+  td.total.gasto{background:#fdf1f1;color:#a13a3a;}
+  tbody tr:hover td{filter:brightness(0.98);}
+
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap;}
+  .badge-efectivo{background:#dff3d8;color:#2f7a2f;}
+  .badge-mp{background:#d8eefa;color:#1c7fa8;}
+  .badge-transferencia{background:#dde3fb;color:#3d4ec2;}
+  .badge-tarjeta{background:#ece2fb;color:#7a3fc9;}
+  .badge-debe{background:#fbdada;color:#c62828;}
+  .badge-saldado{background:#e7e7ea;color:#5f6368;}
+
+  .hint{font-size:11.5px;color:var(--muted);padding:0 28px;font-weight:500;}
+
+  /* ---------- Modal ---------- */
+  .overlay{
+    position:fixed;inset:0;background:rgba(20,20,30,0.4);display:none;
+    align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:50;
+  }
+  .overlay.show{display:flex;}
+  .modal{
+    background:#fff;border-radius:14px;max-width:520px;width:100%;
+    padding:24px 26px 22px;box-shadow:0 12px 40px rgba(0,0,0,0.22);position:relative;
+  }
+  .modal.wide{max-width:640px;}
+  .modal h2{margin:0 0 4px;font-size:16px;font-weight:700;}
+  .modal .modal-sub{font-size:11.5px;color:var(--muted);margin-bottom:18px;font-weight:500;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.3px;}
+  .field label .opt{font-weight:500;color:#c2c4ca;text-transform:none;letter-spacing:0;}
+  select, input[type=text], input[type=number], input[type=tel], input[type=email], input[type=date], input[type=password]{
+    width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;
+    font-size:12.5px;font-family:inherit;color:var(--text);background:#fcfcfd;
+  }
+  select:focus, input:focus{outline:none;border-color:var(--accent);background:#fff;}
+  .row2{display:flex;gap:10px;}
+  .row2 > div{flex:1;}
+  .combo{display:flex;gap:6px;}
+  .combo select{flex:1;}
+  .addbtn{
+    width:36px;flex:none;border:1px solid var(--accent);color:var(--accent);background:#fff;
+    border-radius:8px;font-size:16px;line-height:1;font-weight:700;
+  }
+  .addbtn:hover{background:#eef1ff;}
+  .currency-toggle{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;width:fit-content;}
+  .currency-toggle button{border:none;background:#fcfcfd;padding:8px 18px;font-size:12.5px;font-weight:600;}
+  .currency-toggle button.active{background:var(--accent);color:#fff;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;border-top:1px solid var(--border);padding-top:14px;}
+  .modal-actions.between{justify-content:space-between;}
+  .btn-eliminar{background:#fff;color:#c62828;border:1px solid #f3d3d3;}
+  .btn-eliminar:hover{background:#fdeeee;}
+  .subcard{border:1px dashed var(--border);border-radius:10px;padding:14px;margin-top:8px;background:#fafafc;}
+  .subcard h3{margin:0 0 10px;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;}
+  .close-x{position:absolute;top:16px;right:18px;border:none;background:none;font-size:16px;color:var(--muted);cursor:pointer;}
+
+  .deudores-summary{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+  .deudores-summary .chip{background:#fdeeee;border:1px solid #f3d3d3;color:#a13a3a;padding:8px 14px;border-radius:10px;font-size:12px;font-weight:700;}
+  .deuda-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:8px;}
+  .deuda-info{display:flex;flex-direction:column;gap:2px;}
+  .deuda-info .nom{font-weight:700;font-size:12.5px;}
+  .deuda-info .det{font-size:11px;color:var(--muted);}
+  .deuda-total{font-weight:700;font-size:13px;color:#a13a3a;margin-right:10px;}
+  .empty-state{text-align:center;color:var(--muted);font-size:12.5px;padding:30px 10px;}
+  .warn-banner{background:#fff4e5;border:1px solid #f0c36d;color:#8a6100;padding:10px 12px;border-radius:8px;font-size:12px;font-weight:600;margin-top:6px;}
+
+  .filterbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:14px 28px 0;}
+  .filterbar .btn{padding:7px 12px;font-size:11.5px;}
+  .filterbar input[type=text]{width:100%;min-width:170px;padding:7px 10px;font-size:11.5px;}
+  .deuda-mini{border:1px solid #f3d3d3;background:#fdf4f4;border-radius:8px;padding:10px 12px;margin-bottom:6px;}
+  .deuda-mini label{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:600;color:#a13a3a;text-transform:none;letter-spacing:0;cursor:pointer;}
+  .deuda-mini .det{font-weight:500;color:var(--muted);font-size:10.5px;margin-left:22px;margin-top:2px;}
+
+  .ac-wrap{position:relative;}
+  .ac-dropdown{
+    position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;
+    border:1px solid var(--border);border-radius:8px;box-shadow:0 10px 26px rgba(20,20,30,0.14);
+    max-height:220px;overflow-y:auto;z-index:80;display:none;
+  }
+  .ac-dropdown.show{display:block;}
+  .ac-option{padding:8px 12px;font-size:12px;cursor:pointer;}
+  .ac-option:hover{background:#f1f1f8;}
+  .ac-empty{padding:8px 12px;font-size:11px;color:var(--muted);}
+  .filterbar .ac-wrap{min-width:170px;flex:1;}
+  .combo .ac-wrap{flex:1;}
+
+  .kpi-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
+  .kpi{background:#fafafc;border:1px solid var(--border);border-radius:10px;padding:12px 16px;min-width:150px;}
+  .kpi .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;font-weight:700;}
+  .kpi .val{font-size:16px;font-weight:700;margin-top:4px;}
+
+  .mes-selector{
+    display:flex;align-items:center;gap:10px;margin:14px 28px 0;
+  }
+  .mes-selector button{
+    border:1px solid var(--border);background:#fff;border-radius:7px;width:30px;height:30px;
+    font-size:13px;font-weight:700;color:var(--text);
+  }
+  .mes-selector button:hover{background:#f4f4f6;}
+  .mes-selector button:disabled{opacity:0.35;cursor:not-allowed;}
+  .mes-selector span{font-size:13px;font-weight:700;text-transform:capitalize;min-width:150px;text-align:center;}
+
+  .panel-container{position:relative;}
+  .panel-blur{filter:blur(6px);pointer-events:none;user-select:none;}
+  .panel-gate{
+    position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    z-index:40;padding:20px;
+  }
+  .panel-gate.show{display:flex;}
+  .gate-card{
+    background:#fff;border:1px solid var(--border);border-radius:16px;padding:30px 34px;
+    text-align:center;box-shadow:0 16px 46px rgba(20,20,30,0.16);max-width:320px;
+  }
+  .gate-card h2{margin:0 0 8px;font-size:16px;font-weight:700;}
+  .gate-card p{margin:0 0 18px;font-size:12px;color:var(--muted);line-height:1.5;}
+  .gate-card .btn-primary{padding:10px 22px;}
+
+  .pacientes-scroll{
+    display:flex;gap:12px;overflow-x:auto;padding:8px 2px 16px;
+  }
+  .paciente-card{
+    flex:0 0 220px;border:1px solid var(--border);border-radius:12px;
+    padding:14px;background:#fafafc;
+  }
+  .paciente-card .field{margin-bottom:10px;}
+  .paciente-card label{font-size:9.5px;}
+  .paciente-card input{padding:7px 9px;font-size:11.5px;}
+
+  .pago-row{display:flex;gap:8px;margin-bottom:8px;align-items:center;}
+  .pago-row input{flex:1;min-width:0;}
+  .pago-row select{flex:1;min-width:0;}
+  .pago-row .btn-quitar{
+    flex:none;width:32px;height:34px;border:1px solid var(--border);background:#fff;
+    border-radius:8px;color:#c62828;font-size:14px;
+  }
+  .pago-row .btn-quitar:hover{background:#fdeeee;}
+  .badges-cell{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;white-space:normal !important;}
+
+  .caja-row{
+    border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;
+    display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  }
+  .caja-row .cr-info{display:flex;flex-direction:column;gap:2px;}
+  .caja-row .cr-info .nom{font-weight:700;font-size:12.5px;}
+  .caja-row .cr-info .det{font-size:11px;color:var(--muted);}
+  .caja-row .cr-montos{display:flex;gap:16px;font-size:12px;}
+  .caja-row .cr-montos div{text-align:center;}
+  .caja-row .cr-montos .lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;}
+  .badge-abierta{background:#eef1ff;color:#4842c9;}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="loginScreen">
+  <div class="login-card">
+    <h1>CAJA UMMANA</h1>
+    <div class="sub">Ingresá con tu usuario para continuar</div>
+    <div class="login-error col-hidden" id="loginError"></div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="loginEmail" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="loginPassword" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" id="btnLogin">Ingresar</button>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app" class="col-hidden">
+
+<div class="topbar">
+  <div>
+    <h1>CAJA UMMANA</h1>
+    <div class="sub" id="fechaHoy"></div>
+  </div>
+  <div class="caja-status col-hidden" id="cajaStatus">
+    <div class="dot"></div>
+    <span></span>
+  </div>
+  <div class="actions">
+    <button class="btn col-hidden" id="btnCierre">Cerrar caja</button>
+    <button class="btn" id="btnPacientes">Pacientes</button>
+    <button class="btn btn-deudores" id="btnDeudores">Deudores <span class="badge-count col-hidden" id="deudoresCount">0</span></button>
+    <button class="btn" id="btnReporteDiario">Reporte diario</button>
+    <button class="btn" id="btnPagoProfesional">Calcular pago profesional</button>
+    <button class="btn col-hidden" id="btnInformes">Informes</button>
+    <button class="btn col-hidden" id="btnImportar">Importar catálogo</button>
+    <button class="btn col-hidden" id="btnCajas">Cajas</button>
+    <button class="btn btn-primary" id="btnNuevo">+ Nuevo movimiento</button>
+    <button class="btn" id="btnLogout">Salir</button>
+  </div>
+</div>
+
+<div class="hint" id="cajaHint"></div>
+<div class="mes-selector">
+  <button id="mesPrev" title="Mes anterior">◀</button>
+  <span id="mesLabel"></span>
+  <button id="mesNext" title="Mes siguiente">▶</button>
+</div>
+
+<div class="panel-container" id="panelContainer">
+  <div id="panelContent">
+    <div class="filterbar">
+      <div class="ac-wrap"><input type="text" id="filtroFecha" placeholder="Buscar fecha… ej. 10/9" autocomplete="off"></div>
+      <div class="ac-wrap"><input type="text" id="filtroPaciente" placeholder="Buscar paciente/alumno…" autocomplete="off"></div>
+      <div class="ac-wrap"><input type="text" id="filtroProfesional" placeholder="Buscar profesional/área…" autocomplete="off"></div>
+      <div class="ac-wrap"><input type="text" id="filtroConcepto" placeholder="Buscar concepto…" autocomplete="off"></div>
+      <div class="ac-wrap"><input type="text" id="filtroMedio" placeholder="Buscar tipo de movimiento…" autocomplete="off"></div>
+      <button class="btn" id="btnLimpiarFiltros">Limpiar filtros</button>
+    </div>
+    <br>
+    <div class="sheet-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="editcol"></th>
+          <th>Fecha</th>
+          <th>Paciente/Alumno</th>
+          <th>Profesional</th>
+          <th>Código</th>
+          <th>Concepto</th>
+          <th>Notas/Detalle</th>
+          <th>Total</th>
+          <th>Medio de pago</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="panel-gate" id="panelGate">
+    <div class="gate-card">
+      <h2>Apertura de caja</h2>
+      <p>Abrí la caja con el monto inicial en efectivo para empezar a cargar movimientos.</p>
+      <button class="btn btn-primary" id="btnAbrirDesdeGate">Abrir caja</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============ MODAL: APERTURA DE CAJA ============ -->
+<div class="overlay" id="overlayApertura">
+  <div class="modal">
+    <button class="close-x" id="closeApertura">✕</button>
+    <h2>Apertura de caja</h2>
+    <div class="modal-sub" id="aperturaSugeridaTxt"></div>
+    <div class="field">
+      <label>Monto inicial en efectivo ($)</label>
+      <input type="text" id="inpAperturaMonto" inputmode="numeric" placeholder="0">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="cancelApertura">Cancelar</button>
+      <button class="btn btn-primary" id="confirmarApertura">Abrir caja</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: CIERRE DE CAJA ============ -->
+<div class="overlay" id="overlayCierre">
+  <div class="modal">
+    <button class="close-x" id="closeCierre">✕</button>
+    <h2>Cierre de caja</h2>
+    <div class="modal-sub" id="cierreEsperadoTxt"></div>
+    <div class="field">
+      <label>Monto real contado en caja ($)</label>
+      <input type="text" id="inpCierreMonto" inputmode="numeric" placeholder="0">
+    </div>
+    <div class="warn-banner col-hidden" id="cierreWarning"></div>
+    <div class="modal-actions">
+      <button class="btn" id="cancelCierre">Cancelar</button>
+      <button class="btn btn-primary" id="confirmarCierre">Cerrar caja</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: NUEVO / EDITAR MOVIMIENTO ============ -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <button class="close-x" id="closeModal">✕</button>
+    <h2>Nuevo movimiento</h2>
+    <div class="modal-sub">Se agrega con la fecha de hoy, <span id="fechaModal"></span></div>
+
+    <div class="field">
+      <label>Paciente / Alumno</label>
+      <div class="combo">
+        <div class="ac-wrap">
+          <input type="text" id="selPaciente" placeholder="Escribí para buscar…" autocomplete="off">
+        </div>
+        <button class="addbtn" id="btnAddPaciente" title="Agregar nuevo paciente">+</button>
+      </div>
+    </div>
+
+    <div class="field col-hidden" id="deudasPacienteBox">
+      <label>Esta persona tiene deuda pendiente</label>
+      <div id="deudasPacienteLista"></div>
+    </div>
+
+    <div class="subcard col-hidden" id="cardNuevoPaciente">
+      <h3>Nuevo paciente / alumno</h3>
+      <div class="row2">
+        <div class="field"><label>Apellido *</label><input type="text" id="npApellido"></div>
+        <div class="field"><label>Nombre *</label><input type="text" id="npNombre"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Teléfono <span class="opt">(opcional)</span></label><input type="tel" id="npTelefono"></div>
+        <div class="field"><label>Email <span class="opt">(opcional)</span></label><input type="email" id="npEmail"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Fecha de nacimiento <span class="opt">(opcional)</span></label><input type="date" id="npFnac"></div>
+        <div class="field"><label>DNI <span class="opt">(opcional)</span></label><input type="text" id="npDni"></div>
+      </div>
+      <div class="field">
+        <label>Medio de llegada <span class="opt">(opcional)</span></label>
+        <select id="npMedio">
+          <option value="">Seleccionar…</option>
+          <option>Instagram</option><option>Recomendación</option><option>Google</option>
+          <option>Pasó por la puerta</option><option>Otro</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="cancelPaciente">Cancelar</button>
+        <button class="btn btn-primary" id="guardarPaciente">Guardar paciente</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Profesional / Área</label>
+      <div class="ac-wrap">
+        <input type="text" id="selProfesional" placeholder="Escribí para buscar…" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Concepto</label>
+      <select id="selConcepto" disabled><option value="">Elegí primero un profesional/área…</option></select>
+    </div>
+
+    <div class="field">
+      <label>Notas / Detalle <span class="opt">(opcional)</span></label>
+      <input type="text" id="inpNotas" placeholder="Ej: descuento aplicado, resta pendiente, etc.">
+    </div>
+
+    <div class="row2">
+      <div class="field">
+        <label>Moneda</label>
+        <div class="currency-toggle">
+          <button type="button" class="active" data-cur="$">$</button>
+          <button type="button" data-cur="USD">USD</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Total</label>
+        <input type="text" id="inpValor" inputmode="numeric" placeholder="0">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Pagos <span class="opt">(si no llega al total, la diferencia queda como deuda)</span></label>
+      <div id="pagosLista"></div>
+      <button type="button" class="btn" id="btnAgregarPago" style="margin-top:4px;">+ Agregar pago</button>
+    </div>
+
+    <div class="modal-actions between" id="modalAcciones">
+      <button class="btn btn-eliminar col-hidden" id="btnEliminar">Eliminar registro</button>
+      <div style="display:flex;gap:8px;margin-left:auto;">
+        <button class="btn" id="cancelMov">Cancelar</button>
+        <button class="btn btn-primary" id="guardarMov">Guardar movimiento</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: DEUDORES ============ -->
+<div class="overlay" id="overlayDeudores">
+  <div class="modal wide">
+    <button class="close-x" id="closeDeudores">✕</button>
+    <h2>Deudores</h2>
+    <div class="modal-sub">Movimientos con saldo pendiente ("Debe"). Para saldar una deuda, cargá un nuevo movimiento de esa persona y marcá la deuda que se está saldando.</div>
+    <div class="deudores-summary" id="deudoresResumen"></div>
+    <div id="deudoresLista"></div>
+    <div class="modal-actions">
+      <button class="btn" id="cerrarDeudores">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: CALCULAR PAGO A PROFESIONAL ============ -->
+<div class="overlay" id="overlayPago">
+  <div class="modal wide">
+    <button class="close-x" id="closePago">✕</button>
+    <h2>Calcular pago a profesional</h2>
+    <div class="modal-sub">Movimientos de hoy, <span id="fechaModalPago"></span></div>
+    <div class="field">
+      <label>Profesional</label>
+      <div class="ac-wrap">
+        <input type="text" id="selProfesionalPago" placeholder="Escribí para buscar…" autocomplete="off">
+      </div>
+    </div>
+    <div id="pagoPreview"></div>
+    <div class="modal-actions">
+      <button class="btn" id="cancelPago">Cerrar</button>
+      <button class="btn btn-primary" id="btnExportarPago" disabled>Exportar PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: CAJAS (admin) ============ -->
+<div class="overlay" id="overlayCajas">
+  <div class="modal wide">
+    <button class="close-x" id="closeCajas">✕</button>
+    <h2>Cajas</h2>
+    <div class="modal-sub">Aperturas y cierres registrados, por recepcionista.</div>
+    <div class="mes-selector" id="mesSelectorCajas" style="margin:0 0 16px;">
+      <button id="mesCajasPrev" title="Mes anterior">◀</button>
+      <span id="mesCajasLabel"></span>
+      <button id="mesCajasNext" title="Mes siguiente">▶</button>
+    </div>
+    <div id="cajasLista"></div>
+    <div class="modal-actions">
+      <button class="btn" id="cerrarCajas">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: PACIENTES (buscar y editar) ============ -->
+<div class="overlay" id="overlayPacientes">
+  <div class="modal" style="max-width:1100px;">
+    <button class="close-x" id="closePacientes">✕</button>
+    <h2>Pacientes</h2>
+    <div class="modal-sub">Buscá por apellido o nombre para ver y editar sus datos.</div>
+    <div class="field">
+      <input type="text" id="buscarPacienteInput" placeholder="Buscar por apellido o nombre…" autocomplete="off">
+    </div>
+    <div class="pacientes-scroll" id="pacientesScroll"></div>
+    <div class="modal-actions">
+      <button class="btn" id="cerrarPacientes">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: IMPORTAR CATÁLOGO (admin) ============ -->
+<div class="overlay" id="overlayImportar">
+  <div class="modal wide">
+    <button class="close-x" id="closeImportar">✕</button>
+    <h2>Importar catálogo</h2>
+    <div class="modal-sub">Subí un CSV para cada base. Esto agrega registros nuevos — no borra ni reemplaza los que ya existen.</div>
+
+    <div class="subcard">
+      <h3>Pacientes / alumnos</h3>
+      <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">
+        Columnas: <code>Apellido, Nombre, Telefono, Email, FechaNacimiento, DNI, MedioLlegada</code><br>
+        (Apellido y Nombre son obligatorios; Telefono es opcional)
+      </p>
+      <input type="file" accept=".csv" id="impPacientesFile">
+      <div class="modal-sub" id="impPacientesInfo" style="margin:10px 0 0;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-eliminar" id="btnVaciarPacientes">Vaciar base de pacientes</button>
+        <button class="btn" id="btnCorregirFechas">Corregir fechas guardadas como número</button>
+        <button class="btn btn-primary" id="impPacientesBtn" disabled>Importar pacientes</button>
+      </div>
+    </div>
+
+    <div class="subcard">
+      <h3>Profesionales / Conceptos</h3>
+      <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">
+        Columnas: <code>Profesional, Concepto, Codigo</code><br>
+        (una fila por cada tratamiento o pack; para gastos, usá "GASTOS" como Profesional)
+      </p>
+      <input type="file" accept=".csv" id="impConceptosFile">
+      <div class="modal-sub" id="impConceptosInfo" style="margin:10px 0 0;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="impConceptosBtn" disabled>Importar catálogo</button>
+      </div>
+    </div>
+
+    <div class="subcard">
+      <h3>Mantenimiento</h3>
+      <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">
+        Convierte los movimientos viejos (de antes del sistema de pagos múltiples) al formato nuevo, para que sigan apareciendo bien en Deudores y en los reportes.
+      </p>
+      <div class="modal-sub" id="migrarPagosInfo" style="margin:0 0 10px;"></div>
+      <button class="btn" id="btnMigrarPagos">Migrar movimientos al nuevo formato de pagos</button>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" id="cerrarImportar">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: INFORMES (admin) ============ -->
+<div class="overlay" id="overlayInformes">
+  <div class="modal wide">
+    <button class="close-x" id="closeInformes">✕</button>
+    <h2>Informes</h2>
+    <div class="modal-sub">Panel completo próximamente — por ahora, un resumen del día.</div>
+    <div class="kpi-row" id="kpiRow"></div>
+    <div class="modal-actions">
+      <button class="btn" id="cerrarInformes">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /#app -->
+
+<script>
+/* =====================================================================
+   CONFIGURACIÓN DE FIREBASE
+   Reemplazá estos valores por los de tu proyecto de Firebase
+   (Configuración del proyecto → Tus apps → SDK setup and configuration).
+   ===================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyAql_waJ1I2gIeV6V3MCwVx0OhncgxCsko",
+  authDomain: "ummanasistema.firebaseapp.com",
+  projectId: "ummanasistema",
+  storageBucket: "ummanasistema.firebasestorage.app",
+  messagingSenderId: "370814125756",
+  appId: "1:370814125756:web:0a42e08ba90376fab032b9"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+/* =====================================================================
+   CATÁLOGO DE PROFESIONALES / CONCEPTOS
+   Ahora vive en Firestore, colección "conceptos" — un doc por cada
+   concepto/tratamiento: { profesional, concepto, codigo }.
+   CONCEPTOS se arma en vivo agrupando esa colección por profesional.
+   Se carga vacío al principio: importá el catálogo con el botón
+   "Importar catálogo" (solo administradores) para completarlo.
+   ===================================================================== */
+let CONCEPTOS = {};              // { "SUEROTERAPIA": [{concepto, codigo}, ...], ... }
+let CODIGO_POR_CONCEPTO = {};    // "SUEROTERAPIA||SUERO BASE..." -> "SUE-01", para buscar el código al guardar
+
+const MEDIO_LABELS = {
+  efectivo: (m)=> m.moneda==="USD" ? "Efectivo USD" : "Efectivo $",
+  mp: ()=> "Mercado Pago",
+  tarjeta: ()=> "Tarjeta",
+  transferencia: ()=> "Transferencia",
+};
+
+// ---------------- ESTADO LOCAL (espejo en vivo de Firestore) ----------------
+let currentUser = null;       // {uid, nombre, rol}
+let pacienteRegistry = [];    // ["APELLIDO, Nombre", ...]
+let movimientos = [];         // espejo local de "movimientos" del mes que se está mirando (tabla + filtros)
+let movimientosHoy = [];      // espejo local de los movimientos de HOY, sin importar qué mes se esté mirando (caja, reportes)
+let movimientosDeuda = [];    // espejo local de todas las deudas pendientes, de cualquier fecha (deudores)
+let cajaActual = null;        // doc de la sesión de caja abierta (o null)
+let ultimoCierre = null;      // último cierre registrado (para sugerir la próxima apertura)
+
+function excelSerialToISODate(valor){
+  const n = Number(valor);
+  // Excel guarda las fechas como un número de días desde el 30/12/1899.
+  // Solo lo tratamos como fecha si es un número entero "razonable" (entre 1900 y 2100 aprox).
+  if(!valor || isNaN(n) || !/^\d+$/.test(String(valor).trim()) || n < 1 || n > 73000) return valor;
+  const ms = Math.round((n - 25569) * 86400 * 1000);
+  const d = new Date(ms);
+  return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,'0')+"-"+String(d.getUTCDate()).padStart(2,'0');
+}
+
+function hoyISO(){
+  const d = new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,'0')+"-"+String(d.getDate()).padStart(2,'0');
+}
+function isoToDisplay(iso){
+  const [y,m,d] = iso.split('-');
+  return `${Number(d)}/${Number(m)}`;
+}
+function fmtTotal(m){
+  const pref = m.moneda==="USD" ? "US$ " : "$";
+  return pref + Number(m.valor).toLocaleString('es-AR');
+}
+function fmtMonto(valor, moneda){
+  const pref = moneda==="USD" ? "US$ " : "$";
+  return pref + Number(valor).toLocaleString('es-AR');
+}
+// Devuelve el array de pagos de un movimiento, con compatibilidad para
+// movimientos viejos que todavía tienen un solo medio/valor a nivel raíz
+// (antes de que existiera el reparto en varios pagos).
+function pagosDe(m){
+  if(m.pagos && m.pagos.length) return m.pagos;
+  if(m.medio) return [{medio: m.medio, valor: m.valor, saldada: !!m.saldada, fechaSaldadoISO: m.fechaSaldadoISO||null, fechaSaldadoDisplay: m.fechaSaldadoDisplay||null}];
+  return [];
+}
+function medioLabelDe(medio, moneda){
+  return MEDIO_LABELS[medio] ? MEDIO_LABELS[medio]({moneda}) : medio;
+}
+function medioDisplayText(m){
+  return pagosDe(m).map(p=>{
+    if(p.medio==="debe") return p.saldada ? "Saldado" : "Debe";
+    return medioLabelDe(p.medio, m.moneda);
+  }).join(', ');
+}
+function medioBadgesHTML(m){
+  const pagos = pagosDe(m);
+  const varios = pagos.length > 1;
+  return pagos.map(p=>{
+    const montoTxt = varios ? ` ${fmtMonto(p.valor, m.moneda)}` : "";
+    if(p.medio==="debe"){
+      if(p.saldada) return `<span class="badge badge-saldado">Saldado el ${p.fechaSaldadoDisplay}${montoTxt}</span>`;
+      return `<span class="badge badge-debe">Debe${montoTxt}</span>`;
+    }
+    return `<span class="badge badge-${p.medio}">${medioLabelDe(p.medio, m.moneda)}${montoTxt}</span>`;
+  }).join('');
+}
+function tieneDeudaPendiente(pagos){
+  return pagos.some(p=>p.medio==="debe" && !p.saldada);
+}
+
+/* =====================================================================
+   LOGIN
+   ===================================================================== */
+document.getElementById('btnLogin').onclick = ()=> intentarLogin();
+document.getElementById('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') intentarLogin(); });
+
+function intentarLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPassword').value;
+  const err = document.getElementById('loginError');
+  err.classList.add('col-hidden');
+  if(!email || !pass){ err.textContent = "Completá email y contraseña."; err.classList.remove('col-hidden'); return; }
+  auth.signInWithEmailAndPassword(email, pass).catch(e=>{
+    err.textContent = "No pudimos iniciar sesión: revisá el email y la contraseña.";
+    err.classList.remove('col-hidden');
+  });
+}
+document.getElementById('btnLogout').onclick = ()=> auth.signOut();
+
+let unsubMovimientos = null, unsubPacientes = null, unsubCajaAbierta = null, unsubHoy = null, unsubDeuda = null, unsubConceptos = null;
+
+auth.onAuthStateChanged(async (user)=>{
+  if(!user){
+    document.getElementById('loginScreen').classList.remove('col-hidden');
+    document.getElementById('app').classList.add('col-hidden');
+    if(unsubMovimientos) unsubMovimientos();
+    if(unsubPacientes) unsubPacientes();
+    if(unsubCajaAbierta) unsubCajaAbierta();
+    if(unsubHoy) unsubHoy();
+    if(unsubDeuda) unsubDeuda();
+    if(unsubConceptos) unsubConceptos();
+    return;
+  }
+  const doc = await db.collection('usuarios').doc(user.uid).get();
+  if(!doc.exists){
+    document.getElementById('loginError').textContent = "Tu usuario no tiene un rol asignado. Pedile a un administrador que te cree el registro en 'usuarios'.";
+    document.getElementById('loginError').classList.remove('col-hidden');
+    auth.signOut();
+    return;
+  }
+  currentUser = { uid: user.uid, ...doc.data() };
+  document.getElementById('loginScreen').classList.add('col-hidden');
+  document.getElementById('app').classList.remove('col-hidden');
+  aplicarRolUI();
+  iniciarListeners();
+});
+
+/* =====================================================================
+   MES SELECCIONADO (para el panel de movimientos)
+   ===================================================================== */
+const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const hoyRef = new Date();
+let mesActual = { year: hoyRef.getFullYear(), month: hoyRef.getMonth()+1 }; // month: 1-12
+
+function mesInicioISO(){ return `${mesActual.year}-${String(mesActual.month).padStart(2,'0')}-01`; }
+function mesFinISO(){
+  let y = mesActual.year, m = mesActual.month + 1;
+  if(m>12){ m=1; y++; }
+  return `${y}-${String(m).padStart(2,'0')}-01`;
+}
+function actualizarMesLabel(){
+  document.getElementById('mesLabel').textContent = `${MESES[mesActual.month-1]} ${mesActual.year}`;
+  const esMesActualReal = mesActual.year===hoyRef.getFullYear() && mesActual.month===(hoyRef.getMonth()+1);
+  document.getElementById('mesNext').disabled = esMesActualReal;
+}
+document.getElementById('mesPrev').onclick = ()=>{
+  mesActual.month--; if(mesActual.month<1){ mesActual.month=12; mesActual.year--; }
+  actualizarMesLabel(); suscribirMovimientos();
+};
+document.getElementById('mesNext').onclick = ()=>{
+  mesActual.month++; if(mesActual.month>12){ mesActual.month=1; mesActual.year++; }
+  actualizarMesLabel(); suscribirMovimientos();
+};
+actualizarMesLabel();
+
+function aplicarRolUI(){
+  const esAdmin = currentUser.rol === 'admin';
+  document.getElementById('btnCierre').classList.toggle('col-hidden', esAdmin);
+  document.getElementById('cajaStatus').classList.toggle('col-hidden', esAdmin);
+  document.getElementById('cajaHint').classList.toggle('col-hidden', esAdmin);
+  document.getElementById('btnInformes').classList.toggle('col-hidden', !esAdmin);
+  document.getElementById('btnImportar').classList.toggle('col-hidden', !esAdmin);
+  document.getElementById('btnCajas').classList.toggle('col-hidden', !esAdmin);
+}
+
+/* =====================================================================
+   LISTENERS EN VIVO
+   ===================================================================== */
+function suscribirMovimientos(){
+  if(unsubMovimientos) unsubMovimientos();
+  unsubMovimientos = db.collection('movimientos')
+    .where('fechaISO','>=', mesInicioISO())
+    .where('fechaISO','<', mesFinISO())
+    .orderBy('fechaISO','desc')
+    .onSnapshot(snap=>{
+      movimientos = snap.docs.map(d=> ({id:d.id, ...d.data()}));
+      renderTabla();
+    });
+}
+
+function iniciarListeners(){
+  // Pacientes
+  unsubPacientes = db.collection('pacientes').orderBy('apellido').onSnapshot(snap=>{
+    pacientesFullList = snap.docs.map(d=> ({id:d.id, ...d.data()}));
+    pacienteRegistry = pacientesFullList.map(p=> p.nombreCompleto);
+    if(overlayPacientes.classList.contains('show')) renderPacientesBusqueda();
+  });
+
+  // Catálogo de profesionales/conceptos (con su código)
+  unsubConceptos = db.collection('conceptos').orderBy('profesional').onSnapshot(snap=>{
+    CONCEPTOS = {};
+    CODIGO_POR_CONCEPTO = {};
+    snap.docs.forEach(d=>{
+      const c = d.data();
+      if(!CONCEPTOS[c.profesional]) CONCEPTOS[c.profesional] = [];
+      CONCEPTOS[c.profesional].push({concepto: c.concepto, codigo: c.codigo||""});
+      CODIGO_POR_CONCEPTO[c.profesional+"||"+c.concepto] = c.codigo||"";
+    });
+    poblarProfesionalesUI();
+  });
+
+  // Movimientos del mes elegido (por defecto, el mes en curso)
+  suscribirMovimientos();
+
+  // Movimientos de HOY (independiente del mes que se esté mirando) — para caja y reportes
+  unsubHoy = db.collection('movimientos').where('fechaISO','==', hoyISO()).onSnapshot(snap=>{
+    movimientosHoy = snap.docs.map(d=> ({id:d.id, ...d.data()}));
+    actualizarEstadoCaja();
+  });
+
+  // Deudas pendientes, de cualquier fecha — para el botón Deudores
+  unsubDeuda = db.collection('movimientos').where('tieneDeudaPendiente','==',true).onSnapshot(snap=>{
+    movimientosDeuda = [];
+    snap.docs.forEach(d=>{
+      const m = {id:d.id, ...d.data()};
+      pagosDe(m).forEach((p, idx)=>{
+        if(p.medio==="debe" && !p.saldada){
+          movimientosDeuda.push({movId:m.id, idx, pac:m.pac, prof:m.prof, concepto:m.concepto, notas:m.notas, fechaDisplay:m.fechaDisplay, moneda:m.moneda, valor:p.valor});
+        }
+      });
+    });
+    renderDeudoresCount();
+  });
+
+  // Sesión de caja abierta (si hay)
+  unsubCajaAbierta = db.collection('cajaSesiones').where('cerradaEn','==', null).onSnapshot(async snap=>{
+    if(!snap.empty){
+      const d = snap.docs[0];
+      cajaActual = {id:d.id, ...d.data()};
+    } else {
+      cajaActual = null;
+      // buscamos el último cierre para sugerir la próxima apertura
+      const ult = await db.collection('cajaSesiones').orderBy('cerradaEn','desc').limit(1).get();
+      ultimoCierre = ult.empty ? null : ult.docs[0].data().montoContado;
+    }
+    actualizarEstadoCaja();
+  });
+}
+
+/* =====================================================================
+   TABLA + FILTROS
+   ===================================================================== */
+const tbody = document.getElementById('tbody');
+
+function compareFechas(a,b){
+  const [da,ma] = a.split('/').map(Number);
+  const [db_,mb] = b.split('/').map(Number);
+  return (ma-mb) || (da-db_);
+}
+
+function attachAutocomplete(input, getOptions, onPick){
+  const wrap = input.closest('.ac-wrap');
+  const dd = document.createElement('div');
+  dd.className = 'ac-dropdown';
+  wrap.appendChild(dd);
+  let suppressOpen = false;
+  function renderList(){
+    if(suppressOpen){ suppressOpen = false; return; }
+    const q = input.value.trim().toLowerCase();
+    const opts = getOptions().filter(o=> !q || o.toLowerCase().includes(q));
+    dd.innerHTML = opts.length
+      ? opts.slice(0,40).map(o=>`<div class="ac-option">${o}</div>`).join('')
+      : '<div class="ac-empty">Sin resultados</div>';
+    dd.classList.add('show');
+  }
+  input.addEventListener('focus', renderList);
+  input.addEventListener('input', renderList);
+  dd.addEventListener('mousedown', (e)=>{
+    const opt = e.target.closest('.ac-option');
+    if(!opt) return;
+    input.value = opt.textContent;
+    dd.classList.remove('show');
+    suppressOpen = true;
+    input.dispatchEvent(new Event('input', {bubbles:true}));
+    if(onPick) onPick(opt.textContent);
+  });
+  document.addEventListener('click', (e)=>{ if(!wrap.contains(e.target)) dd.classList.remove('show'); });
+}
+
+const filtroFecha = document.getElementById('filtroFecha');
+const filtroPaciente = document.getElementById('filtroPaciente');
+const filtroProfesional = document.getElementById('filtroProfesional');
+const filtroConcepto = document.getElementById('filtroConcepto');
+const filtroMedio = document.getElementById('filtroMedio');
+
+attachAutocomplete(filtroFecha, ()=> [...new Set(movimientos.map(m=>m.fechaDisplay))].sort(compareFechas));
+attachAutocomplete(filtroPaciente, ()=> [...new Set(movimientos.map(m=>m.pac))].sort());
+attachAutocomplete(filtroProfesional, ()=> Object.keys(CONCEPTOS));
+attachAutocomplete(filtroConcepto, ()=> [...new Set(movimientos.map(m=>m.concepto))]);
+attachAutocomplete(filtroMedio, ()=> ["Efectivo","Mercado Pago","Tarjeta","Transferencia","Debe","Saldado"]);
+
+[filtroFecha, filtroPaciente, filtroProfesional, filtroConcepto, filtroMedio].forEach(f=> f.addEventListener('input', renderTabla));
+document.getElementById('btnLimpiarFiltros').onclick = ()=>{
+  filtroFecha.value = ""; filtroPaciente.value = ""; filtroProfesional.value = "";
+  filtroConcepto.value = ""; filtroMedio.value = "";
+  renderTabla();
+};
+
+function contiene(campo, texto){ return (campo||"").toLowerCase().includes(texto.trim().toLowerCase()); }
+
+function pasaFiltros(m){
+  if(filtroFecha.value && !contiene(m.fechaDisplay, filtroFecha.value)) return false;
+  if(filtroPaciente.value && !contiene(m.pac, filtroPaciente.value)) return false;
+  if(filtroProfesional.value && !contiene(m.prof, filtroProfesional.value)) return false;
+  if(filtroConcepto.value && !contiene(m.concepto, filtroConcepto.value)) return false;
+  if(filtroMedio.value && !contiene(medioDisplayText(m), filtroMedio.value)) return false;
+  return true;
+}
+
+function renderTabla(){
+  tbody.innerHTML = "";
+  movimientos.filter(pasaFiltros).forEach(m=>{
+    const esGasto = m.prof === "GASTOS";
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="editcol"><button class="editbtn" title="Editar" onclick="abrirEdicion('${m.id}')">&#9998;</button></td>
+      <td>${m.fechaDisplay}</td>
+      <td class="left">${m.pac}</td>
+      <td>${m.prof}</td>
+      <td class="codigo">${m.codigo||""}</td>
+      <td class="concepto">${m.concepto}</td>
+      <td class="notas">${m.notas||""}</td>
+      <td class="total ${esGasto?'gasto':''}">${fmtTotal(m)}</td>
+      <td class="badges-cell">${medioBadgesHTML(m)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  renderDeudoresCount();
+}
+
+/* =====================================================================
+   CAJA: APERTURA / CIERRE
+   ===================================================================== */
+document.getElementById('fechaHoy').textContent = new Date().toLocaleDateString('es-AR',{weekday:'long', day:'numeric', month:'long'});
+document.getElementById('fechaModal').textContent = new Date().toLocaleDateString('es-AR');
+
+function calcularEsperadoCaja(){
+  if(!cajaActual) return 0;
+  let ingresos = 0, egresos = 0;
+  movimientosHoy.forEach(m=>{
+    if(m.moneda !== "$") return;
+    pagosDe(m).filter(p=>p.medio==="efectivo").forEach(p=>{
+      if(m.prof === "GASTOS") egresos += p.valor; else ingresos += p.valor;
+    });
+  });
+  return cajaActual.aperturaMonto + ingresos - egresos;
+}
+
+function actualizarEstadoCaja(){
+  const el = document.getElementById('cajaStatus');
+  const btn = document.getElementById('btnCierre');
+  const hint = document.getElementById('cajaHint');
+  const btnNuevo = document.getElementById('btnNuevo');
+  const gate = document.getElementById('panelGate');
+  const content = document.getElementById('panelContent');
+
+  if(currentUser && currentUser.rol === 'admin'){
+    btnNuevo.disabled = false;
+    gate.classList.remove('show');
+    content.classList.remove('panel-blur');
+    return;
+  }
+  if(cajaActual){
+    const esQuienAbrio = cajaActual.recepcionista === currentUser.nombre;
+    el.classList.remove('closed');
+    el.querySelector('span').innerHTML = `Caja abierta — Recepción: <strong>${cajaActual.recepcionista}</strong> · Apertura: $${cajaActual.aperturaMonto.toLocaleString('es-AR')}`;
+    btn.textContent = "Cerrar caja";
+    btn.disabled = !esQuienAbrio;
+    hint.textContent = esQuienAbrio ? "" : `La caja la abrió ${cajaActual.recepcionista} — solo ella puede cerrarla desde su usuario.`;
+    btnNuevo.disabled = false;
+    gate.classList.remove('show');
+    content.classList.remove('panel-blur');
+  } else {
+    el.classList.add('closed');
+    el.querySelector('span').innerHTML = ultimoCierre!==null
+      ? `Caja cerrada — último cierre: $${ultimoCierre.toLocaleString('es-AR')}`
+      : "Caja cerrada — todavía no hay ningún cierre registrado";
+    btn.textContent = "Abrir caja";
+    btn.disabled = false;
+    hint.textContent = "Abrí la caja para poder cargar movimientos.";
+    btnNuevo.disabled = true;
+    gate.classList.add('show');
+    content.classList.add('panel-blur');
+  }
+}
+document.getElementById('btnAbrirDesdeGate').onclick = abrirModalApertura;
+
+
+document.getElementById('btnCierre').onclick = ()=>{
+  if(cajaActual){
+    if(cajaActual.recepcionista !== currentUser.nombre){
+      alert(`La caja la abrió ${cajaActual.recepcionista}. Solo ella puede cerrarla desde su usuario.`);
+      return;
+    }
+    abrirModalCierre();
+  } else {
+    abrirModalApertura();
+  }
+};
+
+const overlayApertura = document.getElementById('overlayApertura');
+const inpAperturaMonto = document.getElementById('inpAperturaMonto');
+
+function abrirModalApertura(){
+  const sugerido = ultimoCierre !== null ? ultimoCierre : 0;
+  inpAperturaMonto.value = sugerido.toLocaleString('es-AR');
+  document.getElementById('aperturaSugeridaTxt').textContent = ultimoCierre !== null
+    ? `Sugerido según el último cierre: $${ultimoCierre.toLocaleString('es-AR')}`
+    : "No hay un cierre anterior registrado — ingresá el monto real con el que arrancás.";
+  overlayApertura.classList.add('show');
+}
+document.getElementById('closeApertura').onclick = ()=> overlayApertura.classList.remove('show');
+document.getElementById('cancelApertura').onclick = ()=> overlayApertura.classList.remove('show');
+inpAperturaMonto.addEventListener('input', ()=>{
+  let raw = inpAperturaMonto.value.replace(/\D/g,"");
+  inpAperturaMonto.value = raw ? Number(raw).toLocaleString('es-AR') : "";
+});
+document.getElementById('confirmarApertura').onclick = async ()=>{
+  const monto = Number(inpAperturaMonto.value.replace(/\D/g,""));
+  if(inpAperturaMonto.value==="" || isNaN(monto)){ alert("Ingresá un monto de apertura."); return; }
+  await db.collection('cajaSesiones').add({
+    fechaISO: hoyISO(), recepcionista: currentUser.nombre,
+    aperturaMonto: monto, abiertaEn: firebase.firestore.FieldValue.serverTimestamp(),
+    cerradaEn: null, montoContado: null, esperadoCierre: null, diferencia: null,
+  });
+  overlayApertura.classList.remove('show');
+};
+
+const overlayCierre = document.getElementById('overlayCierre');
+const inpCierreMonto = document.getElementById('inpCierreMonto');
+
+function abrirModalCierre(){
+  const esperado = calcularEsperadoCaja();
+  document.getElementById('cierreEsperadoTxt').textContent = `Monto esperado en caja: $${esperado.toLocaleString('es-AR')}`;
+  inpCierreMonto.value = esperado.toLocaleString('es-AR');
+  document.getElementById('cierreWarning').classList.add('col-hidden');
+  document.getElementById('confirmarCierre').textContent = "Cerrar caja";
+  overlayCierre.classList.add('show');
+}
+document.getElementById('closeCierre').onclick = ()=> overlayCierre.classList.remove('show');
+document.getElementById('cancelCierre').onclick = ()=> overlayCierre.classList.remove('show');
+inpCierreMonto.addEventListener('input', ()=>{
+  let raw = inpCierreMonto.value.replace(/\D/g,"");
+  inpCierreMonto.value = raw ? Number(raw).toLocaleString('es-AR') : "";
+  document.getElementById('cierreWarning').classList.add('col-hidden');
+  document.getElementById('confirmarCierre').textContent = "Cerrar caja";
+});
+document.getElementById('confirmarCierre').onclick = async ()=>{
+  const contado = Number(inpCierreMonto.value.replace(/\D/g,""));
+  if(inpCierreMonto.value==="" || isNaN(contado)){ alert("Ingresá el monto real contado en caja."); return; }
+  const esperado = calcularEsperadoCaja();
+  const diferencia = contado - esperado;
+  const warn = document.getElementById('cierreWarning');
+
+  if(diferencia !== 0 && warn.classList.contains('col-hidden')){
+    warn.textContent = diferencia > 0
+      ? `⚠️ Hay $${diferencia.toLocaleString('es-AR')} de más respecto de lo esperado ($${esperado.toLocaleString('es-AR')}). Revisá antes de cerrar.`
+      : `⚠️ Faltan $${Math.abs(diferencia).toLocaleString('es-AR')} respecto de lo esperado ($${esperado.toLocaleString('es-AR')}). Revisá antes de cerrar.`;
+    warn.classList.remove('col-hidden');
+    document.getElementById('confirmarCierre').textContent = "Cerrar caja de todos modos";
+    return;
+  }
+
+  await db.collection('cajaSesiones').doc(cajaActual.id).update({
+    cerradaEn: firebase.firestore.FieldValue.serverTimestamp(),
+    montoContado: contado, esperadoCierre: esperado, diferencia,
+  });
+  overlayCierre.classList.remove('show');
+};
+
+/* =====================================================================
+   MODAL: NUEVO / EDITAR MOVIMIENTO
+   ===================================================================== */
+const overlay = document.getElementById('overlay');
+const selPaciente = document.getElementById('selPaciente');
+const selProfesional = document.getElementById('selProfesional');
+const selConcepto = document.getElementById('selConcepto');
+const inpValor = document.getElementById('inpValor');
+const modalTitle = document.querySelector('#overlay .modal h2');
+const btnGuardarMov = document.getElementById('guardarMov');
+const btnEliminar = document.getElementById('btnEliminar');
+let modo = 'nuevo';
+let editingId = null;
+let monedaSel = "$";
+
+const MEDIO_OPCIONES = [
+  {value:"efectivo", label:"Efectivo"},
+  {value:"mp", label:"Mercado Pago"},
+  {value:"tarjeta", label:"Tarjeta"},
+  {value:"transferencia", label:"Transferencia"},
+  {value:"debe", label:"Debe"},
+];
+function opcionesMedioHTML(seleccion){
+  return '<option value="">Medio…</option>' + MEDIO_OPCIONES.map(o=>
+    `<option value="${o.value}" ${o.value===seleccion?"selected":""}>${o.label}</option>`
+  ).join('');
+}
+function agregarFilaPago(monto, medio){
+  const row = document.createElement('div');
+  row.className = 'pago-row';
+  row.innerHTML = `
+    <input type="text" class="pago-monto" inputmode="numeric" placeholder="Monto">
+    <select class="pago-medio">${opcionesMedioHTML(medio||"")}</select>
+    <button type="button" class="btn-quitar" title="Quitar">✕</button>
+  `;
+  const inp = row.querySelector('.pago-monto');
+  inp.value = monto ? Number(monto).toLocaleString('es-AR') : "";
+  inp.addEventListener('input', ()=>{
+    let raw = inp.value.replace(/\D/g,"");
+    inp.value = raw ? Number(raw).toLocaleString('es-AR') : "";
+  });
+  row.querySelector('.btn-quitar').onclick = ()=> row.remove();
+  document.getElementById('pagosLista').appendChild(row);
+}
+document.getElementById('btnAgregarPago').onclick = ()=> agregarFilaPago();
+agregarFilaPago();
+
+function leerPagosForm(){
+  const pagos = [];
+  document.querySelectorAll('#pagosLista .pago-row').forEach(row=>{
+    const monto = Number(row.querySelector('.pago-monto').value.replace(/\D/g,""));
+    const medio = row.querySelector('.pago-medio').value;
+    if(monto>0 && medio) pagos.push({medio, valor: monto, saldada:false, fechaSaldadoISO:null, fechaSaldadoDisplay:null});
+  });
+  return pagos;
+}
+
+function ordenarConceptos(profesional, opts){
+  const copia = opts.slice();
+  if((profesional||"").trim().toUpperCase() === "CREMAS"){
+    copia.sort((a,b)=> a.concepto.localeCompare(b.concepto, 'es'));
+  } else {
+    copia.sort((a,b)=> (a.codigo||"").localeCompare((b.codigo||""), 'es', {numeric:true, sensitivity:'base'}));
+  }
+  return copia;
+}
+
+function actualizarConceptosDesdeProfesional(){
+  const opts = CONCEPTOS[selProfesional.value] || [];
+  if(opts.length){
+    selConcepto.disabled = false;
+    const ordenados = ordenarConceptos(selProfesional.value, opts);
+    selConcepto.innerHTML = ordenados.map(c=>`<option value="${c.concepto}">${c.concepto}${c.codigo ? " — " + c.codigo : ""}</option>`).join('');
+  } else {
+    selConcepto.disabled = true;
+    selConcepto.innerHTML = '<option value="">Sin conceptos configurados</option>';
+  }
+}
+
+function poblarProfesionalesUI(){
+  actualizarConceptosDesdeProfesional();
+}
+attachAutocomplete(selPaciente, ()=> pacienteRegistry);
+attachAutocomplete(selProfesional, ()=> Object.keys(CONCEPTOS).sort());
+selProfesional.addEventListener('input', actualizarConceptosDesdeProfesional);
+
+document.getElementById('btnNuevo').onclick = ()=>{
+  modo = 'nuevo'; editingId = null;
+  modalTitle.textContent = "Nuevo movimiento";
+  btnGuardarMov.textContent = "Guardar movimiento";
+  btnEliminar.classList.add('col-hidden');
+  overlay.classList.add('show');
+};
+
+function abrirEdicion(id){
+  const m = movimientos.find(x=>x.id===id);
+  if(!m) return;
+  modo = 'editar'; editingId = id;
+  modalTitle.textContent = "Editar movimiento";
+  btnGuardarMov.textContent = "Guardar cambios";
+  btnEliminar.classList.remove('col-hidden');
+
+  selPaciente.value = m.pac;
+  selProfesional.value = m.prof;
+  actualizarConceptosDesdeProfesional();
+  selConcepto.value = m.concepto;
+  refreshDeudasPaciente();
+
+  document.getElementById('inpNotas').value = m.notas || "";
+  document.querySelectorAll('.currency-toggle button').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`.currency-toggle button[data-cur="${m.moneda}"]`).classList.add('active');
+  monedaSel = m.moneda;
+
+  document.getElementById('pagosLista').innerHTML = "";
+  pagosDe(m).forEach(p=> agregarFilaPago(p.valor, p.medio));
+
+  inpValor.value = Number(m.valor).toLocaleString('es-AR');
+  overlay.classList.add('show');
+}
+window.abrirEdicion = abrirEdicion;
+
+document.getElementById('closeModal').onclick = cerrarModal;
+document.getElementById('cancelMov').onclick = cerrarModal;
+function cerrarModal(){ overlay.classList.remove('show'); resetModal(); }
+function resetModal(){
+  selPaciente.value = "";
+  selProfesional.value = "";
+  selConcepto.innerHTML = '<option value="">Elegí primero un profesional/área…</option>';
+  selConcepto.disabled = true;
+  document.getElementById('inpNotas').value = "";
+  inpValor.value = "";
+  document.querySelectorAll('.currency-toggle button').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.currency-toggle button[data-cur="$"]').classList.add('active');
+  monedaSel = "$";
+  document.getElementById('pagosLista').innerHTML = "";
+  agregarFilaPago();
+  document.getElementById('cardNuevoPaciente').classList.add('col-hidden');
+  document.getElementById('deudasPacienteBox').classList.add('col-hidden');
+  document.getElementById('deudasPacienteLista').innerHTML = "";
+  modo = 'nuevo'; editingId = null;
+  modalTitle.textContent = "Nuevo movimiento";
+  btnGuardarMov.textContent = "Guardar movimiento";
+  btnEliminar.classList.add('col-hidden');
+}
+
+btnEliminar.onclick = async ()=>{
+  if(editingId===null) return;
+  if(confirm("¿Está seguro de eliminar este registro? Esta opción no tiene vuelta atrás.")){
+    await db.collection('movimientos').doc(editingId).delete();
+    cerrarModal();
+  }
+};
+
+document.getElementById('btnAddPaciente').onclick = ()=> document.getElementById('cardNuevoPaciente').classList.remove('col-hidden');
+document.getElementById('cancelPaciente').onclick = ()=> document.getElementById('cardNuevoPaciente').classList.add('col-hidden');
+document.getElementById('guardarPaciente').onclick = async ()=>{
+  const ape = document.getElementById('npApellido').value.trim();
+  const nom = document.getElementById('npNombre').value.trim();
+  const tel = document.getElementById('npTelefono').value.trim();
+  if(!ape || !nom){ alert("Apellido y nombre son obligatorios."); return; }
+  const nombreCompleto = `${ape.toUpperCase()}, ${nom}`;
+  await db.collection('pacientes').add({
+    apellido: ape.toUpperCase(), nombre: nom, nombreCompleto,
+    telefono: tel,
+    email: document.getElementById('npEmail').value.trim(),
+    fnac: document.getElementById('npFnac').value,
+    dni: document.getElementById('npDni').value.trim(),
+    medioLlegada: document.getElementById('npMedio').value,
+    creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+  selPaciente.value = nombreCompleto;
+  document.getElementById('cardNuevoPaciente').classList.add('col-hidden');
+  ['npApellido','npNombre','npTelefono','npEmail','npFnac','npDni','npMedio'].forEach(id=>document.getElementById(id).value="");
+};
+
+selPaciente.addEventListener('input', refreshDeudasPaciente);
+function refreshDeudasPaciente(){
+  const box = document.getElementById('deudasPacienteBox');
+  const lista = document.getElementById('deudasPacienteLista');
+  const pendientes = movimientosDeuda.filter(d=>d.pac===selPaciente.value && d.movId!==editingId);
+  if(!selPaciente.value || !pendientes.length){
+    box.classList.add('col-hidden'); lista.innerHTML=""; return;
+  }
+  box.classList.remove('col-hidden');
+  lista.innerHTML = pendientes.map(d=>`
+    <div class="deuda-mini">
+      <label><input type="radio" name="saldarDeuda" value="${d.movId}::${d.idx}"> Saldar "${d.concepto}" del ${d.fechaDisplay} — ${fmtMonto(d.valor, d.moneda)}</label>
+      ${d.notas ? `<div class="det">${d.notas}</div>` : ""}
+    </div>
+  `).join('');
+}
+
+document.getElementById('deudasPacienteLista').addEventListener('change', (e)=>{
+  if(!e.target.matches('input[name="saldarDeuda"]')) return;
+  const [movId, idxStr] = e.target.value.split('::');
+  const deuda = movimientosDeuda.find(d=> d.movId===movId && d.idx===Number(idxStr));
+  if(!deuda) return;
+  selProfesional.value = deuda.prof;
+  actualizarConceptosDesdeProfesional();
+  const conceptoSalda = `Salda deuda del ${deuda.fechaDisplay}`;
+  if(![...selConcepto.options].some(o=>o.value===conceptoSalda)){
+    const opt = document.createElement('option');
+    opt.value = conceptoSalda; opt.textContent = conceptoSalda;
+    selConcepto.insertBefore(opt, selConcepto.firstChild);
+  }
+  selConcepto.disabled = false;
+  selConcepto.value = conceptoSalda;
+});
+
+document.querySelectorAll('.currency-toggle button').forEach(btn=>{
+  btn.onclick = ()=>{
+    document.querySelectorAll('.currency-toggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    monedaSel = btn.dataset.cur;
+  };
+});
+inpValor.addEventListener('input', ()=>{
+  let raw = inpValor.value.replace(/\D/g,"");
+  inpValor.value = raw ? Number(raw).toLocaleString('es-AR') : "";
+});
+
+
+btnGuardarMov.onclick = async ()=>{
+  if(!selPaciente.value){ alert("Elegí un paciente/alumno."); return; }
+  if(!selProfesional.value){ alert("Elegí un profesional/área."); return; }
+  if(!selConcepto.value){ alert("Elegí un concepto."); return; }
+  const valorNum = Number(inpValor.value.replace(/\D/g,""));
+  if(!valorNum){ alert("Ingresá un total."); return; }
+
+  let pagos = leerPagosForm();
+  const sumaPagos = pagos.reduce((a,p)=>a+p.valor,0);
+  if(sumaPagos > valorNum){
+    alert(`La suma de los pagos cargados (${fmtMonto(sumaPagos, monedaSel)}) supera el total (${fmtMonto(valorNum, monedaSel)}). Corregí los montos.`);
+    return;
+  }
+  if(sumaPagos < valorNum){
+    pagos.push({medio:"debe", valor: valorNum - sumaPagos, saldada:false, fechaSaldadoISO:null, fechaSaldadoDisplay:null});
+  }
+  if(selProfesional.value === "GASTOS" && pagos.some(p=>p.medio==="debe")){
+    alert('Un gasto no puede quedar como "Debe" — revisá que los pagos cubran el total completo.');
+    return;
+  }
+
+  const radioSaldar = document.querySelector('input[name="saldarDeuda"]:checked');
+  const fechaISO = hoyISO();
+  const fechaDisplay = isoToDisplay(fechaISO);
+  const codigo = CODIGO_POR_CONCEPTO[selProfesional.value+"||"+selConcepto.value] || "";
+  const pendienteDeuda = tieneDeudaPendiente(pagos);
+
+  if(modo==='editar'){
+    if(!confirm("¿Está seguro de editar este registro? Esta opción no tiene vuelta atrás.")) return;
+    const cambios = {
+      pac: selPaciente.value, prof: selProfesional.value, concepto: selConcepto.value, codigo,
+      notas: document.getElementById('inpNotas').value, moneda: monedaSel, valor: valorNum,
+      pagos, tieneDeudaPendiente: pendienteDeuda,
+      actualizadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+    await db.collection('movimientos').doc(editingId).update(cambios);
+  } else {
+    await db.collection('movimientos').add({
+      fechaISO, fechaDisplay, pac: selPaciente.value, prof: selProfesional.value,
+      concepto: selConcepto.value, codigo, notas: document.getElementById('inpNotas').value,
+      moneda: monedaSel, valor: valorNum, pagos, tieneDeudaPendiente: pendienteDeuda,
+      creadoPor: currentUser.nombre, creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+
+  if(radioSaldar){
+    const [movId, idxStr] = radioSaldar.value.split('::');
+    const idx = Number(idxStr);
+    const ref = db.collection('movimientos').doc(movId);
+    const snap = await ref.get();
+    if(snap.exists){
+      const md = snap.data();
+      const pagosDeuda = pagosDe(md).slice();
+      if(pagosDeuda[idx]){
+        pagosDeuda[idx] = {...pagosDeuda[idx], saldada:true, fechaSaldadoISO:fechaISO, fechaSaldadoDisplay:fechaDisplay};
+        await ref.update({
+          pagos: pagosDeuda, tieneDeudaPendiente: tieneDeudaPendiente(pagosDeuda),
+          // por compatibilidad con datos viejos que todavía miran estos campos sueltos:
+          saldada: !tieneDeudaPendiente(pagosDeuda) ? true : (md.saldada||false),
+          fechaSaldadoISO: pagosDeuda[idx].fechaSaldadoISO, fechaSaldadoDisplay: pagosDeuda[idx].fechaSaldadoDisplay,
+        });
+      }
+    }
+  }
+
+  cerrarModal();
+};
+
+/* =====================================================================
+   DEUDORES
+   ===================================================================== */
+const overlayDeudores = document.getElementById('overlayDeudores');
+document.getElementById('btnDeudores').onclick = ()=>{ renderDeudores(); overlayDeudores.classList.add('show'); };
+document.getElementById('closeDeudores').onclick = ()=> overlayDeudores.classList.remove('show');
+document.getElementById('cerrarDeudores').onclick = ()=> overlayDeudores.classList.remove('show');
+
+function renderDeudoresCount(){
+  const pendientes = movimientosDeuda;
+  const badge = document.getElementById('deudoresCount');
+  if(pendientes.length){ badge.textContent = pendientes.length; badge.classList.remove('col-hidden'); }
+  else badge.classList.add('col-hidden');
+}
+function renderDeudores(){
+  const pendientes = movimientosDeuda;
+  const resumen = document.getElementById('deudoresResumen');
+  const lista = document.getElementById('deudoresLista');
+  const totalPesos = pendientes.filter(m=>m.moneda==="$").reduce((a,m)=>a+m.valor,0);
+  const totalUsd = pendientes.filter(m=>m.moneda==="USD").reduce((a,m)=>a+m.valor,0);
+  resumen.innerHTML = "";
+  if(totalPesos>0) resumen.innerHTML += `<div class="chip">Total en $ : $${totalPesos.toLocaleString('es-AR')}</div>`;
+  if(totalUsd>0) resumen.innerHTML += `<div class="chip">Total en USD : US$ ${totalUsd.toLocaleString('es-AR')}</div>`;
+  if(!pendientes.length){ lista.innerHTML = '<div class="empty-state">No hay deudas pendientes 🎉</div>'; return; }
+  lista.innerHTML = pendientes.map(m=>`
+    <div class="deuda-row">
+      <div class="deuda-info">
+        <span class="nom">${m.pac}</span>
+        <span class="det">${m.concepto} — ${m.fechaDisplay}${m.notas ? " · " + m.notas : ""}</span>
+      </div>
+      <span class="deuda-total">${fmtTotal(m)}</span>
+    </div>
+  `).join('');
+}
+
+/* =====================================================================
+   REPORTE DIARIO (PDF horizontal)
+   ===================================================================== */
+document.getElementById('btnReporteDiario').onclick = ()=>{
+  const hoy = hoyISO();
+  const filas = movimientosHoy;
+  if(!filas.length){ alert("Todavía no hay movimientos cargados hoy."); return; }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({orientation:'landscape', unit:'pt', format:'a4'});
+  doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  doc.text(`CAJA UMMANA — Reporte diario`, 40, 40);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  doc.text(document.getElementById('fechaHoy').textContent, 40, 58);
+
+  const body = filas.map(m=>[m.fechaDisplay, m.pac, m.prof, m.concepto, m.notas||"", fmtTotal(m), medioDisplayText(m)]);
+  doc.autoTable({
+    startY: 72,
+    head: [["Fecha","Paciente/Alumno","Profesional","Concepto","Notas","Total","Medio de pago"]],
+    body, styles:{font:'helvetica', fontSize:9, cellPadding:5},
+    headStyles:{fillColor:[111,106,248], textColor:255},
+    alternateRowStyles:{fillColor:[247,247,250]},
+  });
+
+  let totalPesosIn=0, totalUsdIn=0, totalPesosOut=0, totalUsdOut=0;
+  filas.forEach(m=>{
+    const esGasto = m.prof === "GASTOS";
+    if(m.moneda==="USD"){ esGasto ? totalUsdOut+=m.valor : totalUsdIn+=m.valor; }
+    else { esGasto ? totalPesosOut+=m.valor : totalPesosIn+=m.valor; }
+  });
+  let y = doc.lastAutoTable.finalY + 24;
+  doc.setFontSize(10);
+  doc.text(`Ingresos:  $ ${totalPesosIn.toLocaleString('es-AR')}   ·   US$ ${totalUsdIn.toLocaleString('es-AR')}`, 40, y); y+=16;
+  doc.text(`Egresos:   $ ${totalPesosOut.toLocaleString('es-AR')}   ·   US$ ${totalUsdOut.toLocaleString('es-AR')}`, 40, y); y+=18;
+  doc.setFont('helvetica','bold');
+  doc.text(`Saldo neto: $ ${(totalPesosIn-totalPesosOut).toLocaleString('es-AR')}   ·   US$ ${(totalUsdIn-totalUsdOut).toLocaleString('es-AR')}`, 40, y);
+  doc.save(`reporte-diario-${hoy}.pdf`);
+};
+
+/* =====================================================================
+   CALCULAR PAGO A PROFESIONAL
+   ===================================================================== */
+const overlayPago = document.getElementById('overlayPago');
+const selProfesionalPago = document.getElementById('selProfesionalPago');
+let pagoMovsActuales = [];
+attachAutocomplete(selProfesionalPago, ()=> Object.keys(CONCEPTOS).filter(p=>p!=="GASTOS"));
+
+document.getElementById('btnPagoProfesional').onclick = ()=>{
+  selProfesionalPago.value = "";
+  document.getElementById('pagoPreview').innerHTML = "";
+  document.getElementById('btnExportarPago').disabled = true;
+  document.getElementById('fechaModalPago').textContent = new Date().toLocaleDateString('es-AR');
+  overlayPago.classList.add('show');
+};
+document.getElementById('closePago').onclick = ()=> overlayPago.classList.remove('show');
+document.getElementById('cancelPago').onclick = ()=> overlayPago.classList.remove('show');
+
+function refreshPagoPreview(){
+  const prof = selProfesionalPago.value;
+  const preview = document.getElementById('pagoPreview');
+  const btnExp = document.getElementById('btnExportarPago');
+  const hoy = hoyISO();
+  pagoMovsActuales = movimientosHoy.filter(m=>m.prof===prof);
+  if(!prof || !pagoMovsActuales.length){
+    preview.innerHTML = prof ? '<div class="empty-state">Sin movimientos hoy para este profesional.</div>' : "";
+    btnExp.disabled = true; return;
+  }
+  let totalPesos=0, totalUsd=0;
+  pagoMovsActuales.forEach(m=> m.moneda==="USD" ? totalUsd+=m.valor : totalPesos+=m.valor);
+  preview.innerHTML = `
+    <div class="deudores-summary">
+      ${totalPesos>0 ? `<div class="chip" style="background:#e3f1de;border-color:#c6e3ba;color:#2f7a2f;">A pagar en $ : $${totalPesos.toLocaleString('es-AR')}</div>` : ""}
+      ${totalUsd>0 ? `<div class="chip" style="background:#e3f1de;border-color:#c6e3ba;color:#2f7a2f;">A pagar en USD : US$ ${totalUsd.toLocaleString('es-AR')}</div>` : ""}
+    </div>
+    ${pagoMovsActuales.map(m=>`
+      <div class="deuda-row">
+        <div class="deuda-info"><span class="nom">${m.pac}</span><span class="det">${m.concepto}${m.notas ? " · " + m.notas : ""}</span></div>
+        <span class="deuda-total" style="color:#2f7a2f;">${fmtTotal(m)}</span>
+      </div>
+    `).join('')}
+  `;
+  btnExp.disabled = false;
+}
+selProfesionalPago.addEventListener('input', refreshPagoPreview);
+
+document.getElementById('btnExportarPago').onclick = ()=>{
+  const prof = selProfesionalPago.value;
+  if(!pagoMovsActuales.length) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({orientation:'landscape', unit:'pt', format:'a4'});
+  doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  doc.text(`CAJA UMMANA — Pago a profesional: ${prof}`, 40, 40);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  doc.text(new Date().toLocaleDateString('es-AR'), 40, 58);
+
+  const body = pagoMovsActuales.map(m=>[m.pac, m.concepto, m.notas||"", fmtTotal(m), medioDisplayText(m)]);
+  doc.autoTable({
+    startY: 72, head: [["Paciente/Alumno","Concepto","Notas","Total","Medio de pago"]], body,
+    styles:{font:'helvetica', fontSize:9, cellPadding:5}, headStyles:{fillColor:[111,106,248], textColor:255},
+    alternateRowStyles:{fillColor:[247,247,250]},
+  });
+
+  let totalPesos=0, totalUsd=0;
+  pagoMovsActuales.forEach(m=> m.moneda==="USD" ? totalUsd+=m.valor : totalPesos+=m.valor);
+  let y = doc.lastAutoTable.finalY + 26;
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  if(totalPesos>0){ doc.text(`Total a pagar: $ ${totalPesos.toLocaleString('es-AR')}`, 40, y); y+=18; }
+  if(totalUsd>0){ doc.text(`Total a pagar: US$ ${totalUsd.toLocaleString('es-AR')}`, 40, y); }
+  doc.save(`pago-${prof.replace(/[^a-z0-9]+/gi,'-')}-${hoyISO()}.pdf`);
+};
+
+/* =====================================================================
+   INFORMES (admin) — resumen básico por ahora
+   ===================================================================== */
+const overlayInformes = document.getElementById('overlayInformes');
+document.getElementById('btnInformes').onclick = ()=>{ renderInformes(); overlayInformes.classList.add('show'); };
+document.getElementById('closeInformes').onclick = ()=> overlayInformes.classList.remove('show');
+document.getElementById('cerrarInformes').onclick = ()=> overlayInformes.classList.remove('show');
+
+function renderInformes(){
+  const hoy = hoyISO();
+  const filas = movimientosHoy;
+  let ingresos=0, egresos=0, deudaPendiente=0;
+  filas.forEach(m=>{
+    if(m.prof==="GASTOS") egresos += (m.moneda==="$"?m.valor:0);
+    else ingresos += (m.moneda==="$"?m.valor:0);
+  });
+  movimientosDeuda.filter(m=>m.moneda==="$").forEach(m=> deudaPendiente += m.valor);
+
+  document.getElementById('kpiRow').innerHTML = `
+    <div class="kpi"><div class="lbl">Ingresos hoy</div><div class="val">$${ingresos.toLocaleString('es-AR')}</div></div>
+    <div class="kpi"><div class="lbl">Egresos hoy</div><div class="val">$${egresos.toLocaleString('es-AR')}</div></div>
+    <div class="kpi"><div class="lbl">Saldo neto hoy</div><div class="val">$${(ingresos-egresos).toLocaleString('es-AR')}</div></div>
+    <div class="kpi"><div class="lbl">Deuda pendiente total</div><div class="val">$${deudaPendiente.toLocaleString('es-AR')}</div></div>
+  `;
+}
+
+/* =====================================================================
+   IMPORTAR CATÁLOGO (admin) — pacientes y profesionales/conceptos vía CSV
+   ===================================================================== */
+const overlayImportar = document.getElementById('overlayImportar');
+document.getElementById('btnImportar').onclick = ()=>{
+  document.getElementById('impPacientesInfo').textContent = "";
+  document.getElementById('impPacientesFile').value = "";
+  document.getElementById('impPacientesBtn').disabled = true;
+  impPacientesRows = [];
+  document.getElementById('impConceptosInfo').textContent = "";
+  document.getElementById('impConceptosFile').value = "";
+  document.getElementById('impConceptosBtn').disabled = true;
+  impConceptosRows = [];
+  overlayImportar.classList.add('show');
+};
+document.getElementById('closeImportar').onclick = ()=> overlayImportar.classList.remove('show');
+document.getElementById('cerrarImportar').onclick = ()=> overlayImportar.classList.remove('show');
+
+async function importarEnLotes(coleccion, filas){
+  const CHUNK = 400;
+  for(let i=0; i<filas.length; i+=CHUNK){
+    const lote = db.batch();
+    filas.slice(i, i+CHUNK).forEach(dato=>{
+      const ref = db.collection(coleccion).doc();
+      lote.set(ref, dato);
+    });
+    await lote.commit();
+  }
+}
+
+async function vaciarColeccion(coleccion){
+  const CHUNK = 400;
+  let snap = await db.collection(coleccion).limit(CHUNK).get();
+  let total = 0;
+  while(!snap.empty){
+    const lote = db.batch();
+    snap.docs.forEach(d=> lote.delete(d.ref));
+    await lote.commit();
+    total += snap.size;
+    snap = await db.collection(coleccion).limit(CHUNK).get();
+  }
+  return total;
+}
+
+document.getElementById('btnCorregirFechas').onclick = async ()=>{
+  if(!confirm("Esto revisa todos los pacientes y convierte las fechas de nacimiento que hayan quedado guardadas como número de Excel a una fecha real. ¿Continuamos?")) return;
+  document.getElementById('btnCorregirFechas').disabled = true;
+  document.getElementById('impPacientesInfo').textContent = "Revisando pacientes…";
+
+  const snap = await db.collection('pacientes').get();
+  const CHUNK = 400;
+  let corregidos = 0;
+  let pendientes = [];
+  snap.docs.forEach(d=>{
+    const fnac = d.data().fnac;
+    if(fnac && /^\d+$/.test(String(fnac).trim())){
+      const nueva = excelSerialToISODate(fnac);
+      if(nueva !== fnac){ pendientes.push({ref: d.ref, fnac: nueva}); }
+    }
+  });
+  for(let i=0; i<pendientes.length; i+=CHUNK){
+    const lote = db.batch();
+    pendientes.slice(i, i+CHUNK).forEach(p=> lote.update(p.ref, {fnac: p.fnac}));
+    await lote.commit();
+    corregidos += Math.min(CHUNK, pendientes.length - i);
+  }
+
+  document.getElementById('impPacientesInfo').textContent = corregidos
+    ? `Se corrigieron ${corregidos} fechas de nacimiento.`
+    : "No encontré fechas guardadas como número — ya está todo bien.";
+  document.getElementById('btnCorregirFechas').disabled = false;
+};
+
+document.getElementById('btnMigrarPagos').onclick = async ()=>{
+  if(!confirm("Esto revisa todos los movimientos y les agrega el nuevo campo de pagos si todavía no lo tienen. No cambia montos ni medios. ¿Continuamos?")) return;
+  document.getElementById('btnMigrarPagos').disabled = true;
+  document.getElementById('migrarPagosInfo').textContent = "Revisando movimientos…";
+  try{
+    const snap = await db.collection('movimientos').get();
+    const CHUNK = 400;
+    const pendientes = [];
+    snap.docs.forEach(d=>{
+      const m = d.data();
+      if(!m.pagos){
+        const pagos = pagosDe(m);
+        pendientes.push({ref: d.ref, pagos, tieneDeudaPendiente: tieneDeudaPendiente(pagos)});
+      }
+    });
+    for(let i=0; i<pendientes.length; i+=CHUNK){
+      const lote = db.batch();
+      pendientes.slice(i, i+CHUNK).forEach(p=> lote.update(p.ref, {pagos: p.pagos, tieneDeudaPendiente: p.tieneDeudaPendiente}));
+      await lote.commit();
+    }
+    document.getElementById('migrarPagosInfo').textContent = pendientes.length
+      ? `Se migraron ${pendientes.length} movimientos.`
+      : "No había movimientos para migrar — ya está todo al día.";
+  }catch(e){
+    document.getElementById('migrarPagosInfo').textContent = "Error: " + e.message;
+  }
+  document.getElementById('btnMigrarPagos').disabled = false;
+};
+
+document.getElementById('btnVaciarPacientes').onclick = async ()=>{
+  if(!confirm("Esto borra TODOS los pacientes de la base, sin excepción. No se puede deshacer. ¿Confirmás que querés vaciarla?")) return;
+  if(!confirm("Confirmá una vez más: se van a eliminar todos los pacientes para volver a importarlos. ¿Seguimos?")) return;
+  document.getElementById('btnVaciarPacientes').disabled = true;
+  document.getElementById('impPacientesInfo').textContent = "Borrando pacientes…";
+  const total = await vaciarColeccion('pacientes');
+  document.getElementById('impPacientesInfo').textContent = `Se borraron ${total} pacientes. Ya podés importar el CSV de nuevo.`;
+  document.getElementById('btnVaciarPacientes').disabled = false;
+};
+
+let impPacientesRows = [];
+document.getElementById('impPacientesFile').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  Papa.parse(file, {
+    header:true, skipEmptyLines:true,
+    complete: (res)=>{
+      impPacientesRows = res.data.map(r=>({
+        apellido: (r.Apellido||r.apellido||"").trim(),
+        nombre: (r.Nombre||r.nombre||"").trim(),
+        telefono: (r.Telefono||r["Teléfono"]||r.telefono||"").trim(),
+        email: (r.Email||r.email||"").trim(),
+        fnac: excelSerialToISODate((r.FechaNacimiento||r.fechaNacimiento||"").trim()),
+        dni: (r.DNI||r.dni||"").trim(),
+        medioLlegada: (r.MedioLlegada||r.medioLlegada||"").trim(),
+      })).filter(r=>r.apellido && r.nombre);
+      const invalidos = res.data.length - impPacientesRows.length;
+      document.getElementById('impPacientesInfo').textContent =
+        `${impPacientesRows.length} pacientes listos para importar` + (invalidos>0 ? ` (se ignoran ${invalidos} filas sin apellido/nombre)` : "");
+      document.getElementById('impPacientesBtn').disabled = impPacientesRows.length===0;
+    }
+  });
+});
+document.getElementById('impPacientesBtn').onclick = async ()=>{
+  if(!impPacientesRows.length) return;
+  if(!confirm(`¿Importar ${impPacientesRows.length} pacientes? Esta acción no se puede deshacer.`)) return;
+  document.getElementById('impPacientesBtn').disabled = true;
+  try{
+    await importarEnLotes('pacientes', impPacientesRows.map(r=>({
+      apellido: r.apellido.toUpperCase(), nombre: r.nombre,
+      nombreCompleto: `${r.apellido.toUpperCase()}, ${r.nombre}`,
+      telefono: r.telefono, email: r.email, fnac: r.fnac, dni: r.dni, medioLlegada: r.medioLlegada,
+      creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+    })));
+    document.getElementById('impPacientesInfo').textContent = "¡Listo! Pacientes importados.";
+  }catch(e){
+    document.getElementById('impPacientesInfo').textContent = "Error al importar: " + e.message;
+    document.getElementById('impPacientesBtn').disabled = false;
+  }
+};
+
+let impConceptosRows = [];
+document.getElementById('impConceptosFile').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  Papa.parse(file, {
+    header:true, skipEmptyLines:true,
+    complete: (res)=>{
+      impConceptosRows = res.data.map(r=>({
+        profesional: (r.Profesional||r.profesional||"").trim(),
+        concepto: (r.Concepto||r.concepto||"").trim(),
+        codigo: (r.Codigo||r["Código"]||r.codigo||"").trim(),
+      })).filter(r=>r.profesional && r.concepto);
+      const invalidos = res.data.length - impConceptosRows.length;
+      document.getElementById('impConceptosInfo').textContent =
+        `${impConceptosRows.length} conceptos listos para importar` + (invalidos>0 ? ` (se ignoran ${invalidos} filas sin profesional/concepto)` : "");
+      document.getElementById('impConceptosBtn').disabled = impConceptosRows.length===0;
+    }
+  });
+});
+document.getElementById('impConceptosBtn').onclick = async ()=>{
+  if(!impConceptosRows.length) return;
+  if(!confirm(`¿Importar ${impConceptosRows.length} conceptos? Esta acción no se puede deshacer.`)) return;
+  document.getElementById('impConceptosBtn').disabled = true;
+  try{
+    await importarEnLotes('conceptos', impConceptosRows);
+    document.getElementById('impConceptosInfo').textContent = "¡Listo! Catálogo importado.";
+  }catch(e){
+    document.getElementById('impConceptosInfo').textContent = "Error al importar: " + e.message;
+    document.getElementById('impConceptosBtn').disabled = false;
+  }
+};
+
+/* =====================================================================
+   PANEL "CAJAS" (admin) — historial de apertura/cierre por mes
+   ===================================================================== */
+const overlayCajas = document.getElementById('overlayCajas');
+let mesCajas = { year: hoyRef.getFullYear(), month: hoyRef.getMonth()+1 };
+
+function mesCajasInicioISO(){ return `${mesCajas.year}-${String(mesCajas.month).padStart(2,'0')}-01`; }
+function mesCajasFinISO(){
+  let y = mesCajas.year, m = mesCajas.month + 1;
+  if(m>12){ m=1; y++; }
+  return `${y}-${String(m).padStart(2,'0')}-01`;
+}
+function actualizarMesCajasLabel(){
+  document.getElementById('mesCajasLabel').textContent = `${MESES[mesCajas.month-1]} ${mesCajas.year}`;
+  const esMesActualReal = mesCajas.year===hoyRef.getFullYear() && mesCajas.month===(hoyRef.getMonth()+1);
+  document.getElementById('mesCajasNext').disabled = esMesActualReal;
+}
+
+document.getElementById('btnCajas').onclick = ()=>{
+  mesCajas = { year: hoyRef.getFullYear(), month: hoyRef.getMonth()+1 };
+  actualizarMesCajasLabel();
+  cargarCajas();
+  overlayCajas.classList.add('show');
+};
+document.getElementById('closeCajas').onclick = ()=> overlayCajas.classList.remove('show');
+document.getElementById('cerrarCajas').onclick = ()=> overlayCajas.classList.remove('show');
+document.getElementById('mesCajasPrev').onclick = ()=>{
+  mesCajas.month--; if(mesCajas.month<1){ mesCajas.month=12; mesCajas.year--; }
+  actualizarMesCajasLabel(); cargarCajas();
+};
+document.getElementById('mesCajasNext').onclick = ()=>{
+  mesCajas.month++; if(mesCajas.month>12){ mesCajas.month=1; mesCajas.year++; }
+  actualizarMesCajasLabel(); cargarCajas();
+};
+
+async function cargarCajas(){
+  const cont = document.getElementById('cajasLista');
+  cont.innerHTML = '<div class="empty-state">Cargando…</div>';
+  try{
+    const snap = await db.collection('cajaSesiones')
+      .where('fechaISO','>=', mesCajasInicioISO())
+      .where('fechaISO','<', mesCajasFinISO())
+      .orderBy('fechaISO','desc')
+      .get();
+    if(snap.empty){ cont.innerHTML = '<div class="empty-state">No hay aperturas registradas este mes.</div>'; return; }
+    cont.innerHTML = snap.docs.map(d=>{
+      const c = d.data();
+      const horaApertura = c.abiertaEn ? c.abiertaEn.toDate().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : "—";
+      const horaCierre = c.cerradaEn ? c.cerradaEn.toDate().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : null;
+      let badge;
+      if(!c.cerradaEn){
+        badge = `<span class="badge badge-abierta">Caja abierta</span>`;
+      } else if(c.diferencia === 0){
+        badge = `<span class="badge badge-efectivo">Coincide</span>`;
+      } else {
+        const signo = c.diferencia>0 ? "de más" : "de menos";
+        badge = `<span class="badge badge-debe">Diferencia $${Math.abs(c.diferencia).toLocaleString('es-AR')} ${signo}</span>`;
+      }
+      return `
+        <div class="caja-row">
+          <div class="cr-info">
+            <span class="nom">${isoToDisplay(c.fechaISO)} — ${c.recepcionista}</span>
+            <span class="det">Apertura ${horaApertura}${horaCierre ? " · Cierre " + horaCierre : ""}</span>
+          </div>
+          <div class="cr-montos">
+            <div><div class="lbl">Apertura</div>$${Number(c.aperturaMonto).toLocaleString('es-AR')}</div>
+            ${c.cerradaEn ? `
+              <div><div class="lbl">Esperado</div>$${Number(c.esperadoCierre).toLocaleString('es-AR')}</div>
+              <div><div class="lbl">Contado</div>$${Number(c.montoContado).toLocaleString('es-AR')}</div>
+            ` : ""}
+          </div>
+          ${badge}
+        </div>
+      `;
+    }).join('');
+  }catch(e){
+    cont.innerHTML = `<div class="empty-state">Error al cargar: ${e.message}</div>`;
+  }
+}
+
+/* =====================================================================
+   PANEL "PACIENTES" (buscar y editar, para ambos roles)
+   ===================================================================== */
+let pacientesFullList = [];
+const overlayPacientes = document.getElementById('overlayPacientes');
+const buscarPacienteInput = document.getElementById('buscarPacienteInput');
+
+document.getElementById('btnPacientes').onclick = ()=>{
+  buscarPacienteInput.value = "";
+  document.getElementById('pacientesScroll').innerHTML = '<div class="empty-state">Escribí un apellido o nombre para buscar.</div>';
+  overlayPacientes.classList.add('show');
+  buscarPacienteInput.focus();
+};
+document.getElementById('closePacientes').onclick = ()=> overlayPacientes.classList.remove('show');
+document.getElementById('cerrarPacientes').onclick = ()=> overlayPacientes.classList.remove('show');
+buscarPacienteInput.addEventListener('input', renderPacientesBusqueda);
+
+function renderPacientesBusqueda(){
+  const q = buscarPacienteInput.value.trim().toLowerCase();
+  const cont = document.getElementById('pacientesScroll');
+  if(!q){ cont.innerHTML = '<div class="empty-state">Escribí un apellido o nombre para buscar.</div>'; return; }
+  const encontrados = pacientesFullList.filter(p=>
+    (p.apellido||"").toLowerCase().includes(q) || (p.nombre||"").toLowerCase().includes(q)
+  ).slice(0,60);
+  if(!encontrados.length){ cont.innerHTML = '<div class="empty-state">No encontré pacientes con ese nombre.</div>'; return; }
+  cont.innerHTML = encontrados.map(p=>`
+    <div class="paciente-card" data-id="${p.id}">
+      <div class="field"><label>Apellido</label><input type="text" class="pc-apellido" value="${p.apellido||""}"></div>
+      <div class="field"><label>Nombre</label><input type="text" class="pc-nombre" value="${p.nombre||""}"></div>
+      <div class="field"><label>Teléfono</label><input type="tel" class="pc-telefono" value="${p.telefono||""}"></div>
+      <div class="field"><label>Email</label><input type="email" class="pc-email" value="${p.email||""}"></div>
+      <div class="field"><label>Fecha nac.</label><input type="text" class="pc-fnac" value="${p.fnac||""}"></div>
+      <div class="field"><label>DNI</label><input type="text" class="pc-dni" value="${p.dni||""}"></div>
+      <div class="field"><label>Medio de llegada</label><input type="text" class="pc-medio" value="${p.medioLlegada||""}"></div>
+      <button class="btn btn-primary" style="width:100%;" onclick="guardarPacienteCard('${p.id}', this)">Guardar cambios</button>
+    </div>
+  `).join('');
+}
+
+async function guardarPacienteCard(id, btn){
+  const card = btn.closest('.paciente-card');
+  const apellido = card.querySelector('.pc-apellido').value.trim().toUpperCase();
+  const nombre = card.querySelector('.pc-nombre').value.trim();
+  if(!apellido || !nombre){ alert("Apellido y nombre son obligatorios."); return; }
+  const datos = {
+    apellido, nombre, nombreCompleto: `${apellido}, ${nombre}`,
+    telefono: card.querySelector('.pc-telefono').value.trim(),
+    email: card.querySelector('.pc-email').value.trim(),
+    fnac: card.querySelector('.pc-fnac').value.trim(),
+    dni: card.querySelector('.pc-dni').value.trim(),
+    medioLlegada: card.querySelector('.pc-medio').value.trim(),
+  };
+  btn.disabled = true; btn.textContent = "Guardando…";
+  try{
+    await db.collection('pacientes').doc(id).update(datos);
+    btn.textContent = "¡Guardado!";
+    setTimeout(()=>{ btn.textContent = "Guardar cambios"; btn.disabled = false; }, 1200);
+  }catch(e){
+    alert("No se pudo guardar: " + e.message);
+    btn.disabled = false; btn.textContent = "Guardar cambios";
+  }
+}
+window.guardarPacienteCard = guardarPacienteCard;
+</script>
+</body>
+</html>
