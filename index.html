@@ -137,6 +137,8 @@
   .badge-tarjeta{background:#ece2fb;color:#7a3fc9;}
   .badge-debe{background:#fbdada;color:#c62828;}
   .badge-saldado{background:#e7e7ea;color:#5f6368;}
+  .badge-cobra-ummana{background:#e3f1de;color:#2f7a2f;}
+  .badge-cobra-profesional{background:#f4f4f6;color:#5f6368;}
 
   .hint{font-size:11.5px;color:var(--muted);padding:0 28px;font-weight:500;}
 
@@ -379,6 +381,7 @@
               <th>Notas/Detalle</th>
               <th>Total</th>
               <th>Medio de pago</th>
+              <th>Cobró</th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
@@ -905,6 +908,15 @@ function medioBadgesHTML(m){
     return `<span class="badge badge-${p.medio}">${medioLabelDe(p.medio, m.moneda)}${montoTxt}</span>`;
   }).join('');
 }
+function cobroBadgesHTML(m){
+  const pagos = pagosDe(m);
+  const varios = pagos.length > 1;
+  return pagos.map(p=>{
+    const montoTxt = varios ? ` ${fmtMonto(p.valor, m.moneda)}` : "";
+    const esProf = p.cobradoPor === "profesional";
+    return `<span class="badge ${esProf?'badge-cobra-profesional':'badge-cobra-ummana'}">${esProf?'Profesional':'Ummana'}${montoTxt}</span>`;
+  }).join('');
+}
 function tieneDeudaPendiente(pagos){
   return pagos.some(p=>p.medio==="debe" && !p.saldada);
 }
@@ -1013,7 +1025,8 @@ function suscribirMovimientos(){
   unsubMovimientos = db.collection('movimientos')
     .where('fechaISO','>=', mesInicioISO())
     .where('fechaISO','<', mesFinISO())
-    .orderBy('fechaISO','desc')
+    .orderBy('fechaISO','asc')
+    .orderBy('creadoEn','asc')
     .onSnapshot(snap=>{
       movimientos = snap.docs.map(d=> ({id:d.id, ...d.data()}));
       renderTabla();
@@ -1217,6 +1230,7 @@ function renderTabla(){
       <td class="notas">${m.notas||""}</td>
       <td class="total ${esGasto?'egreso':'ingreso'}">${fmtTotal(m)}</td>
       <td class="badges-cell">${medioBadgesHTML(m)}</td>
+      <td class="badges-cell">${cobroBadgesHTML(m)}</td>
     `;
     tbody.appendChild(tr);
   });
