@@ -16,6 +16,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
   :root{
@@ -69,6 +70,28 @@
   .caja-status.closed{background:#fdeeee;border-color:#f3d3d3;color:#a13a3a;}
   .caja-status.closed .dot{background:#c62828;}
   .actions{display:flex;gap:10px;flex-wrap:wrap;}
+
+  .layout{display:flex;align-items:flex-start;}
+  .sidebar{
+    width:230px;flex:none;background:#fff;border-right:1px solid var(--border);
+    padding:16px 10px;transition:width 0.18s ease, padding 0.18s ease;overflow:hidden;
+    min-height:calc(100vh - 65px);
+  }
+  .sidebar.collapsed{width:44px;padding:16px 6px;}
+  .sidebar.collapsed .sidebar-links button{display:none;}
+  .sidebar-toggle{
+    border:none;background:#f4f4f6;width:32px;height:32px;border-radius:8px;
+    font-size:14px;margin-bottom:14px;color:var(--text);
+  }
+  .sidebar-toggle:hover{background:#eaeaee;}
+  .sidebar-links{display:flex;flex-direction:column;gap:4px;}
+  .sidebar-links button{
+    text-align:left;width:100%;white-space:nowrap;border:none;background:transparent;
+    padding:10px 12px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--text);
+  }
+  .sidebar-links button:hover{background:#f4f4f6;}
+  .sidebar-links .btn-deudores{background:transparent;position:relative;}
+  .main-area{flex:1;min-width:0;}
   .btn{
     border:1px solid var(--border);background:#fff;padding:8px 16px;border-radius:7px;
     font-size:12.5px;font-weight:600;color:var(--text);
@@ -234,6 +257,11 @@
     background:var(--accent);color:#fff;border:1px solid var(--accent);border-radius:7px;
   }
   .fila-editable .btn-guardar-fila:hover{background:var(--accent-dk);}
+  .fila-editable .btn-eliminar-fila{
+    flex:0 0 auto;width:28px;height:28px;border:1px solid #f3d3d3;background:#fff;
+    color:#c62828;border-radius:7px;font-size:12px;font-weight:700;
+  }
+  .fila-editable .btn-eliminar-fila:hover{background:#fdeeee;}
   .lista-toolbar{display:flex;gap:8px;margin-bottom:10px;align-items:center;}
   .lista-toolbar input[type=text]{flex:1;}
 
@@ -294,63 +322,73 @@
   </div>
   <div class="actions">
     <button class="btn col-hidden" id="btnCierre">Cerrar caja</button>
-    <button class="btn" id="btnPacientes">Pacientes</button>
-    <button class="btn btn-deudores" id="btnDeudores">Deudores <span class="badge-count col-hidden" id="deudoresCount">0</span></button>
-    <button class="btn" id="btnReporteDiario">Reporte diario</button>
-    <button class="btn" id="btnPagoProfesional">Calcular pago profesional</button>
-    <button class="btn col-hidden" id="btnInformes">Informes</button>
-    <button class="btn col-hidden" id="btnImportar">Importar catálogo</button>
-    <button class="btn col-hidden" id="btnCajas">Cajas</button>
-    <button class="btn col-hidden" id="btnProfesionalesPanel">Profesionales/Área</button>
-    <button class="btn col-hidden" id="btnConceptosPanel">Conceptos</button>
     <button class="btn btn-primary" id="btnNuevo">+ Nuevo movimiento</button>
     <button class="btn" id="btnLogout">Salir</button>
   </div>
 </div>
 
-<div class="hint" id="cajaHint"></div>
-<div class="mes-selector">
-  <button id="mesPrev" title="Mes anterior">◀</button>
-  <span id="mesLabel"></span>
-  <button id="mesNext" title="Mes siguiente">▶</button>
-</div>
-
-<div class="panel-container" id="panelContainer">
-  <div id="panelContent">
-    <div class="filterbar">
-      <div class="ac-wrap"><input type="text" id="filtroFecha" placeholder="Buscar fecha… ej. 10/9" autocomplete="off"></div>
-      <div class="ac-wrap"><input type="text" id="filtroPaciente" placeholder="Buscar paciente/alumno…" autocomplete="off"></div>
-      <div class="ac-wrap"><input type="text" id="filtroProfesional" placeholder="Buscar profesional/área…" autocomplete="off"></div>
-      <div class="ac-wrap"><input type="text" id="filtroConcepto" placeholder="Buscar concepto…" autocomplete="off"></div>
-      <div class="ac-wrap"><input type="text" id="filtroMedio" placeholder="Buscar tipo de movimiento…" autocomplete="off"></div>
-      <button class="btn" id="btnLimpiarFiltros">Limpiar filtros</button>
-    </div>
-    <br>
-    <div class="sheet-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th class="editcol"></th>
-          <th>Fecha</th>
-          <th>Paciente/Alumno</th>
-          <th>Profesional</th>
-          <th>Código</th>
-          <th>Concepto</th>
-          <th>Notas/Detalle</th>
-          <th>Total</th>
-          <th>Medio de pago</th>
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-    </table>
+<div class="layout">
+  <div class="sidebar" id="sidebarNav">
+    <button class="sidebar-toggle" id="sidebarToggle" title="Contraer/expandir">☰</button>
+    <div class="sidebar-links" id="sidebarLinks">
+      <button class="btn col-hidden" id="btnCajas">🗄 Cajas</button>
+      <button class="btn" id="btnPacientes">🧑 Pacientes</button>
+      <button class="btn col-hidden" id="btnProfesionalesPanel">🩺 Profesionales/Áreas</button>
+      <button class="btn col-hidden" id="btnConceptosPanel">📋 Conceptos</button>
+      <button class="btn btn-deudores" id="btnDeudores">💰 Deudores <span class="badge-count col-hidden" id="deudoresCount">0</span></button>
+      <button class="btn col-hidden" id="btnInformes">📊 Informes</button>
+      <button class="btn" id="btnReporteDiario">🧾 Reporte diario</button>
+      <button class="btn" id="btnPagoProfesional">💵 Calcular pago profesional</button>
+      <button class="btn col-hidden" id="btnImportar">⬆ Importar catálogo</button>
     </div>
   </div>
 
-  <div class="panel-gate" id="panelGate">
-    <div class="gate-card">
-      <h2>Apertura de caja</h2>
-      <p>Abrí la caja con el monto inicial en efectivo para empezar a cargar movimientos.</p>
-      <button class="btn btn-primary" id="btnAbrirDesdeGate">Abrir caja</button>
+  <div class="main-area">
+    <div class="hint" id="cajaHint"></div>
+    <div class="mes-selector">
+      <button id="mesPrev" title="Mes anterior">◀</button>
+      <span id="mesLabel"></span>
+      <button id="mesNext" title="Mes siguiente">▶</button>
+    </div>
+
+    <div class="panel-container" id="panelContainer">
+      <div id="panelContent">
+        <div class="filterbar">
+          <div class="ac-wrap"><input type="text" id="filtroFecha" placeholder="Buscar fecha… ej. 10/9" autocomplete="off"></div>
+          <div class="ac-wrap"><input type="text" id="filtroPaciente" placeholder="Buscar paciente/alumno…" autocomplete="off"></div>
+          <div class="ac-wrap"><input type="text" id="filtroProfesional" placeholder="Buscar profesional/área…" autocomplete="off"></div>
+          <div class="ac-wrap"><input type="text" id="filtroConcepto" placeholder="Buscar concepto…" autocomplete="off"></div>
+          <div class="ac-wrap"><input type="text" id="filtroMedio" placeholder="Buscar tipo de movimiento…" autocomplete="off"></div>
+          <button class="btn" id="btnLimpiarFiltros">Limpiar filtros</button>
+        </div>
+        <br>
+        <div class="sheet-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="editcol"></th>
+              <th>Fecha</th>
+              <th>Paciente/Alumno</th>
+              <th>Profesional</th>
+              <th>Código</th>
+              <th>Concepto</th>
+              <th>Notas/Detalle</th>
+              <th>Total</th>
+              <th>Medio de pago</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        </div>
+      </div>
+
+      <div class="panel-gate" id="panelGate">
+        <div class="gate-card">
+          <h2>Apertura de caja</h2>
+          <p>Abrí la caja con el monto inicial en efectivo para empezar a cargar movimientos.</p>
+          <button class="btn btn-primary" id="btnAbrirDesdeGate">Abrir caja</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -570,6 +608,7 @@
     <div class="modal-sub">Orden alfabético — escribí para filtrar por apellido o nombre.</div>
     <div class="lista-toolbar">
       <input type="text" id="buscarPacienteInput" placeholder="Buscar por apellido o nombre…" autocomplete="off">
+      <button class="addbtn" id="btnNuevoPaciente" title="Agregar paciente">+</button>
     </div>
     <div class="lista-rows" id="pacientesScroll"></div>
     <div class="modal-actions">
@@ -586,10 +625,17 @@
     <div class="modal-sub">Orden alfabético — definí si cada uno es ingreso o egreso. Esto determina cómo se carga el movimiento (paciente o destinatario) y de qué color se ve el total.</div>
     <div class="lista-toolbar">
       <input type="text" id="buscarProfesionalInput" placeholder="Buscar profesional/área…" autocomplete="off">
+      <button class="addbtn" id="btnNuevoProfesional" title="Agregar profesional/área">+</button>
     </div>
     <div class="lista-rows" id="profesionalesScroll"></div>
+    <div class="modal-sub" id="importarProfesionalesInfo" style="margin:10px 0 0;"></div>
     <div class="modal-actions">
-      <button class="btn" id="cerrarProfesionalesPanel">Cerrar</button>
+      <button class="btn" id="btnExportarProfesionales">Exportar Excel</button>
+      <label class="btn" style="cursor:pointer;margin:0;">
+        Importar Excel
+        <input type="file" id="inpImportarProfesionales" accept=".xlsx,.xls" style="display:none;">
+      </label>
+      <button class="btn" id="cerrarProfesionalesPanel" style="margin-left:auto;">Cerrar</button>
     </div>
   </div>
 </div>
@@ -599,13 +645,20 @@
   <div class="modal" style="max-width:1000px;">
     <button class="close-x" id="closeConceptos">✕</button>
     <h2>Conceptos</h2>
-    <div class="modal-sub">Escribí para buscar por profesional, concepto o código.</div>
+    <div class="modal-sub">Escribí para buscar por área, código o concepto.</div>
     <div class="lista-toolbar">
       <input type="text" id="buscarConceptoInput" placeholder="Buscar…" autocomplete="off">
+      <button class="addbtn" id="btnNuevoConcepto" title="Agregar concepto">+</button>
     </div>
     <div class="lista-rows" id="conceptosScroll"></div>
+    <div class="modal-sub" id="importarConceptosInfo" style="margin:10px 0 0;"></div>
     <div class="modal-actions">
-      <button class="btn" id="cerrarConceptos">Cerrar</button>
+      <button class="btn" id="btnExportarConceptos">Exportar Excel</button>
+      <label class="btn" style="cursor:pointer;margin:0;">
+        Importar Excel
+        <input type="file" id="inpImportarConceptos" accept=".xlsx,.xls" style="display:none;">
+      </label>
+      <button class="btn" id="cerrarConceptos" style="margin-left:auto;">Cerrar</button>
     </div>
   </div>
 </div>
@@ -665,7 +718,30 @@
   <div class="modal wide">
     <button class="close-x" id="closeInformes">✕</button>
     <h2>Informes</h2>
-    <div class="modal-sub">Panel completo próximamente — por ahora, un resumen del día.</div>
+    <div class="modal-sub">Elegí el rango de fechas y, si querés, un profesional/área puntual.</div>
+
+    <div class="row2">
+      <div class="field">
+        <label>Fecha desde</label>
+        <input type="date" id="informeFechaDesde">
+      </div>
+      <div class="field">
+        <label>Fecha hasta</label>
+        <input type="date" id="informeFechaHasta">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Profesional / Área <span class="opt">(opcional)</span></label>
+      <div class="ac-wrap">
+        <input type="text" id="informeProfesional" placeholder="Todos" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="modal-actions" style="border-top:none;padding-top:0;">
+      <button class="btn btn-primary" id="btnGenerarInforme">Generar</button>
+    </div>
+
     <div class="kpi-row" id="kpiRow"></div>
     <div class="modal-actions">
       <button class="btn" id="cerrarInformes">Cerrar</button>
@@ -799,6 +875,9 @@ function intentarLogin(){
   });
 }
 document.getElementById('btnLogout').onclick = ()=> auth.signOut();
+document.getElementById('sidebarToggle').onclick = ()=>{
+  document.getElementById('sidebarNav').classList.toggle('collapsed');
+};
 
 let unsubMovimientos = null, unsubPacientes = null, unsubCajaAbierta = null, unsubHoy = null, unsubDeuda = null, unsubConceptos = null, unsubProfesionales = null;
 let profesionalesFullList = [];
@@ -1258,7 +1337,7 @@ function actualizarConceptosDesdeProfesional(){
   if(opts.length){
     selConcepto.disabled = false;
     const ordenados = ordenarConceptos(selProfesional.value, opts);
-    selConcepto.innerHTML = ordenados.map(c=>`<option value="${c.concepto}">${c.concepto}${c.codigo ? " — " + c.codigo : ""}</option>`).join('');
+    selConcepto.innerHTML = ordenados.map(c=>`<option value="${c.concepto}">${c.codigo ? c.codigo + " - " : ""}${c.concepto}</option>`).join('');
   } else {
     selConcepto.disabled = true;
     selConcepto.innerHTML = '<option value="">Sin conceptos configurados</option>';
@@ -1662,30 +1741,58 @@ document.getElementById('btnExportarPago').onclick = ()=>{
 };
 
 /* =====================================================================
-   INFORMES (admin) — resumen básico por ahora
+   INFORMES (admin) — rango de fechas + filtro por profesional
    ===================================================================== */
 const overlayInformes = document.getElementById('overlayInformes');
-document.getElementById('btnInformes').onclick = ()=>{ renderInformes(); overlayInformes.classList.add('show'); };
+const informeProfesional = document.getElementById('informeProfesional');
+attachAutocomplete(informeProfesional, ()=> ["Todos", ...Object.keys(CONCEPTOS).sort()]);
+
+document.getElementById('btnInformes').onclick = ()=>{
+  const hoy = hoyISO();
+  document.getElementById('informeFechaDesde').value = hoy;
+  document.getElementById('informeFechaHasta').value = hoy;
+  informeProfesional.value = "";
+  document.getElementById('kpiRow').innerHTML = "";
+  overlayInformes.classList.add('show');
+};
 document.getElementById('closeInformes').onclick = ()=> overlayInformes.classList.remove('show');
 document.getElementById('cerrarInformes').onclick = ()=> overlayInformes.classList.remove('show');
 
-function renderInformes(){
-  const hoy = hoyISO();
-  const filas = movimientosHoy;
-  let ingresos=0, egresos=0, deudaPendiente=0;
-  filas.forEach(m=>{
-    if(esEgreso(m.prof)) egresos += (m.moneda==="$"?m.valor:0);
-    else ingresos += (m.moneda==="$"?m.valor:0);
-  });
-  movimientosDeuda.filter(m=>m.moneda==="$").forEach(m=> deudaPendiente += m.valor);
+document.getElementById('btnGenerarInforme').onclick = async ()=>{
+  const desde = document.getElementById('informeFechaDesde').value;
+  const hasta = document.getElementById('informeFechaHasta').value;
+  if(!desde || !hasta){ alert("Elegí fecha desde y hasta."); return; }
+  if(desde > hasta){ alert("La fecha 'desde' no puede ser posterior a 'hasta'."); return; }
+  const profElegido = informeProfesional.value.trim();
+  const filtrarProf = profElegido && profElegido.toLowerCase() !== "todos";
 
-  document.getElementById('kpiRow').innerHTML = `
-    <div class="kpi"><div class="lbl">Ingresos hoy</div><div class="val">$${ingresos.toLocaleString('es-AR')}</div></div>
-    <div class="kpi"><div class="lbl">Egresos hoy</div><div class="val">$${egresos.toLocaleString('es-AR')}</div></div>
-    <div class="kpi"><div class="lbl">Saldo neto hoy</div><div class="val">$${(ingresos-egresos).toLocaleString('es-AR')}</div></div>
-    <div class="kpi"><div class="lbl">Deuda pendiente total</div><div class="val">$${deudaPendiente.toLocaleString('es-AR')}</div></div>
-  `;
-}
+  const btn = document.getElementById('btnGenerarInforme');
+  btn.disabled = true; btn.textContent = "Calculando…";
+  document.getElementById('kpiRow').innerHTML = '<div class="empty-state">Calculando…</div>';
+
+  try{
+    let query = db.collection('movimientos').where('fechaISO','>=', desde).where('fechaISO','<=', hasta);
+    if(filtrarProf) query = query.where('prof','==', profElegido);
+    const snap = await query.get();
+    const filas = snap.docs.map(d=> d.data());
+
+    let ingresosPesos=0, egresosPesos=0, ingresosUsd=0, egresosUsd=0;
+    filas.forEach(m=>{
+      const out = esEgreso(m.prof);
+      if(m.moneda==="USD"){ out ? egresosUsd+=m.valor : ingresosUsd+=m.valor; }
+      else { out ? egresosPesos+=m.valor : ingresosPesos+=m.valor; }
+    });
+
+    document.getElementById('kpiRow').innerHTML = `
+      <div class="kpi"><div class="lbl">Ingresos</div><div class="val">$${ingresosPesos.toLocaleString('es-AR')}</div>${ingresosUsd?`<div class="lbl" style="margin-top:4px;">US$ ${ingresosUsd.toLocaleString('es-AR')}</div>`:""}</div>
+      <div class="kpi"><div class="lbl">Egresos</div><div class="val">$${egresosPesos.toLocaleString('es-AR')}</div>${egresosUsd?`<div class="lbl" style="margin-top:4px;">US$ ${egresosUsd.toLocaleString('es-AR')}</div>`:""}</div>
+      <div class="kpi"><div class="lbl">Saldo neto</div><div class="val">$${(ingresosPesos-egresosPesos).toLocaleString('es-AR')}</div>${(ingresosUsd||egresosUsd)?`<div class="lbl" style="margin-top:4px;">US$ ${(ingresosUsd-egresosUsd).toLocaleString('es-AR')}</div>`:""}</div>
+    `;
+  }catch(e){
+    document.getElementById('kpiRow').innerHTML = `<div class="empty-state">Error al calcular: ${e.message}</div>`;
+  }
+  btn.disabled = false; btn.textContent = "Generar";
+};
 
 /* =====================================================================
    IMPORTAR CATÁLOGO (admin) — pacientes y profesionales/conceptos vía CSV
@@ -1956,28 +2063,28 @@ async function cargarCajas(){
    PANEL "PACIENTES" (buscar y editar, para ambos roles)
    ===================================================================== */
 let pacientesFullList = [];
+let mostrarNuevoPaciente = false;
 const overlayPacientes = document.getElementById('overlayPacientes');
 const buscarPacienteInput = document.getElementById('buscarPacienteInput');
 
 document.getElementById('btnPacientes').onclick = ()=>{
   buscarPacienteInput.value = "";
+  mostrarNuevoPaciente = false;
   renderPacientesBusqueda();
   overlayPacientes.classList.add('show');
   buscarPacienteInput.focus();
 };
 document.getElementById('closePacientes').onclick = ()=> overlayPacientes.classList.remove('show');
 document.getElementById('cerrarPacientes').onclick = ()=> overlayPacientes.classList.remove('show');
+document.getElementById('btnNuevoPaciente').onclick = ()=>{
+  mostrarNuevoPaciente = !mostrarNuevoPaciente;
+  renderPacientesBusqueda();
+};
 buscarPacienteInput.addEventListener('input', renderPacientesBusqueda);
 
-function renderPacientesBusqueda(){
-  const q = buscarPacienteInput.value.trim().toLowerCase();
-  const cont = document.getElementById('pacientesScroll');
-  const filtrados = q
-    ? pacientesFullList.filter(p=> (p.apellido||"").toLowerCase().includes(q) || (p.nombre||"").toLowerCase().includes(q))
-    : pacientesFullList;
-  if(!filtrados.length){ cont.innerHTML = '<div class="empty-state">No encontré pacientes con ese nombre.</div>'; return; }
-  cont.innerHTML = filtrados.map(p=>`
-    <div class="fila-editable" data-id="${p.id}">
+function filaPacienteHTML(p, esNueva){
+  return `
+    <div class="fila-editable" data-id="${p.id||''}">
       <input type="text" class="col pc-apellido" value="${p.apellido||""}" placeholder="Apellido">
       <input type="text" class="col pc-nombre" value="${p.nombre||""}" placeholder="Nombre">
       <input type="tel" class="col col-chico pc-telefono" value="${p.telefono||""}" placeholder="Teléfono">
@@ -1985,10 +2092,47 @@ function renderPacientesBusqueda(){
       <input type="text" class="col col-chico pc-fnac" value="${p.fnac||""}" placeholder="F. nac.">
       <input type="text" class="col col-chico pc-dni" value="${p.dni||""}" placeholder="DNI">
       <input type="text" class="col pc-medio" value="${p.medioLlegada||""}" placeholder="Medio de llegada">
-      <button class="btn-guardar-fila" onclick="guardarPacienteCard('${p.id}', this)">Guardar</button>
+      <button class="btn-guardar-fila" onclick="${esNueva ? 'crearPacienteFila(this)' : `guardarPacienteCard('${p.id}', this)`}">${esNueva ? "Crear" : "Guardar"}</button>
+      ${esNueva ? "" : `<button class="btn-eliminar-fila" onclick="eliminarPacienteFila('${p.id}', this)" title="Eliminar">✕</button>`}
     </div>
-  `).join('');
+  `;
 }
+
+function renderPacientesBusqueda(){
+  const q = buscarPacienteInput.value.trim().toLowerCase();
+  const cont = document.getElementById('pacientesScroll');
+  const filtrados = q
+    ? pacientesFullList.filter(p=> (p.apellido||"").toLowerCase().includes(q) || (p.nombre||"").toLowerCase().includes(q))
+    : pacientesFullList;
+  const nuevaFila = mostrarNuevoPaciente ? filaPacienteHTML({}, true) : "";
+  if(!filtrados.length && !nuevaFila){ cont.innerHTML = '<div class="empty-state">No encontré pacientes con ese nombre.</div>'; return; }
+  cont.innerHTML = nuevaFila + filtrados.map(p=> filaPacienteHTML(p, false)).join('');
+}
+
+async function crearPacienteFila(btn){
+  const fila = btn.closest('.fila-editable');
+  const apellido = fila.querySelector('.pc-apellido').value.trim().toUpperCase();
+  const nombre = fila.querySelector('.pc-nombre').value.trim();
+  if(!apellido || !nombre){ alert("Apellido y nombre son obligatorios."); return; }
+  const datos = {
+    apellido, nombre, nombreCompleto: `${apellido}, ${nombre}`,
+    telefono: fila.querySelector('.pc-telefono').value.trim(),
+    email: fila.querySelector('.pc-email').value.trim(),
+    fnac: fila.querySelector('.pc-fnac').value.trim(),
+    dni: fila.querySelector('.pc-dni').value.trim(),
+    medioLlegada: fila.querySelector('.pc-medio').value.trim(),
+    creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+  btn.disabled = true; btn.textContent = "Creando…";
+  try{
+    await db.collection('pacientes').add(datos);
+    mostrarNuevoPaciente = false;
+  }catch(e){
+    alert("No se pudo crear: " + e.message);
+    btn.disabled = false; btn.textContent = "Crear";
+  }
+}
+window.crearPacienteFila = crearPacienteFila;
 
 async function guardarPacienteCard(id, btn){
   const fila = btn.closest('.fila-editable');
@@ -2016,19 +2160,37 @@ async function guardarPacienteCard(id, btn){
 }
 window.guardarPacienteCard = guardarPacienteCard;
 
+async function eliminarPacienteFila(id, btn){
+  if(!confirm("¿Eliminar este paciente? Esta acción no se puede deshacer. No borra los movimientos ya cargados con su nombre.")) return;
+  btn.disabled = true;
+  try{
+    await db.collection('pacientes').doc(id).delete();
+  }catch(e){
+    alert("No se pudo eliminar: " + e.message);
+    btn.disabled = false;
+  }
+}
+window.eliminarPacienteFila = eliminarPacienteFila;
+
 /* =====================================================================
    PANEL "PROFESIONALES / ÁREA" (admin) — ingreso/egreso
    ===================================================================== */
 const overlayProfesionalesPanel = document.getElementById('overlayProfesionalesPanel');
 const buscarProfesionalInput = document.getElementById('buscarProfesionalInput');
+let mostrarNuevoProfesional = false;
 
 document.getElementById('btnProfesionalesPanel').onclick = ()=>{
   buscarProfesionalInput.value = "";
+  mostrarNuevoProfesional = false;
   renderProfesionalesBusqueda();
   overlayProfesionalesPanel.classList.add('show');
 };
 document.getElementById('closeProfesionalesPanel').onclick = ()=> overlayProfesionalesPanel.classList.remove('show');
 document.getElementById('cerrarProfesionalesPanel').onclick = ()=> overlayProfesionalesPanel.classList.remove('show');
+document.getElementById('btnNuevoProfesional').onclick = ()=>{
+  mostrarNuevoProfesional = !mostrarNuevoProfesional;
+  renderProfesionalesBusqueda();
+};
 buscarProfesionalInput.addEventListener('input', renderProfesionalesBusqueda);
 
 // Combina lo que ya está guardado en la colección "profesionales" con cualquier
@@ -2043,27 +2205,48 @@ function listaProfesionalesCombinada(){
   return Object.values(porNombre).sort((a,b)=> a.nombre.localeCompare(b.nombre,'es'));
 }
 
+function filaProfesionalHTML(p, esNueva){
+  return `
+    <div class="fila-editable" data-nombre="${p.nombre||''}" data-id="${p.id||''}">
+      <input type="text" class="col pf-nombre" value="${p.nombre||''}" placeholder="Nombre del profesional/área">
+      <select class="col-chico pf-tipo">
+        <option value="ingreso" ${p.tipo!=='egreso'?'selected':''}>Ingreso</option>
+        <option value="egreso" ${p.tipo==='egreso'?'selected':''}>Egreso</option>
+      </select>
+      <button class="btn-guardar-fila" onclick="${esNueva ? 'crearProfesionalFila(this)' : 'guardarProfesionalFila(this)'}">${esNueva ? "Crear" : "Guardar"}</button>
+      ${(esNueva || !p.id) ? "" : `<button class="btn-eliminar-fila" onclick="eliminarProfesionalFila('${p.id}', this)" title="Eliminar">✕</button>`}
+    </div>
+  `;
+}
+
 function renderProfesionalesBusqueda(){
   const q = buscarProfesionalInput.value.trim().toLowerCase();
   const cont = document.getElementById('profesionalesScroll');
   const lista = listaProfesionalesCombinada().filter(p=> !q || p.nombre.toLowerCase().includes(q));
-  if(!lista.length){ cont.innerHTML = '<div class="empty-state">No encontré profesionales/área con ese nombre.</div>'; return; }
-  cont.innerHTML = lista.map(p=>`
-    <div class="fila-editable" data-nombre="${p.nombre}" data-id="${p.id||''}">
-      <input type="text" class="col pf-nombre" value="${p.nombre}" placeholder="Nombre">
-      <select class="col-chico pf-tipo">
-        <option value="ingreso" ${p.tipo==='ingreso'?'selected':''}>Ingreso</option>
-        <option value="egreso" ${p.tipo==='egreso'?'selected':''}>Egreso</option>
-      </select>
-      <button class="btn-guardar-fila" onclick="guardarProfesionalFila(this)">Guardar</button>
-    </div>
-  `).join('');
+  const nuevaFila = mostrarNuevoProfesional ? filaProfesionalHTML({tipo:"ingreso"}, true) : "";
+  if(!lista.length && !nuevaFila){ cont.innerHTML = '<div class="empty-state">No encontré profesionales/área con ese nombre.</div>'; return; }
+  cont.innerHTML = nuevaFila + lista.map(p=> filaProfesionalHTML(p, false)).join('');
 }
+
+async function crearProfesionalFila(btn){
+  const fila = btn.closest('.fila-editable');
+  const nombre = fila.querySelector('.pf-nombre').value.trim();
+  const tipo = fila.querySelector('.pf-tipo').value;
+  if(!nombre){ alert("El nombre no puede quedar vacío."); return; }
+  btn.disabled = true; btn.textContent = "Creando…";
+  try{
+    await db.collection('profesionales').add({nombre, tipo});
+    mostrarNuevoProfesional = false;
+  }catch(e){
+    alert("No se pudo crear: " + e.message);
+    btn.disabled = false; btn.textContent = "Crear";
+  }
+}
+window.crearProfesionalFila = crearProfesionalFila;
 
 async function guardarProfesionalFila(btn){
   const fila = btn.closest('.fila-editable');
   const id = fila.dataset.id;
-  const nombreOriginal = fila.dataset.nombre;
   const nombre = fila.querySelector('.pf-nombre').value.trim();
   const tipo = fila.querySelector('.pf-tipo').value;
   if(!nombre){ alert("El nombre no puede quedar vacío."); return; }
@@ -2084,20 +2267,80 @@ async function guardarProfesionalFila(btn){
 }
 window.guardarProfesionalFila = guardarProfesionalFila;
 
+async function eliminarProfesionalFila(id, btn){
+  if(!confirm("¿Eliminar este profesional/área? Los conceptos que tenga asignados no se borran, pero van a quedar sin tipo definido hasta que los reasignes.")) return;
+  btn.disabled = true;
+  try{
+    await db.collection('profesionales').doc(id).delete();
+  }catch(e){
+    alert("No se pudo eliminar: " + e.message);
+    btn.disabled = false;
+  }
+}
+window.eliminarProfesionalFila = eliminarProfesionalFila;
+
+document.getElementById('btnExportarProfesionales').onclick = ()=>{
+  const filas = listaProfesionalesCombinada().map(p=> ({
+    "Profesional/Área": p.nombre,
+    "Tipo": p.tipo==="egreso" ? "Egreso" : "Ingreso",
+  }));
+  const ws = XLSX.utils.json_to_sheet(filas);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Profesionales");
+  XLSX.writeFile(wb, "profesionales-area.xlsx");
+};
+
+document.getElementById('inpImportarProfesionales').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const info = document.getElementById('importarProfesionalesInfo');
+  info.textContent = "Leyendo archivo…";
+  try{
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data);
+    const filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+    const existentesPorNombre = {};
+    profesionalesFullList.forEach(p=> existentesPorNombre[p.nombre] = p.id);
+    let creados = 0, actualizados = 0;
+    for(const fila of filas){
+      const nombre = (fila["Profesional/Área"] || fila["Profesional/Area"] || fila["Nombre"] || "").toString().trim();
+      const tipoTxt = (fila["Tipo"] || "").toString().trim().toLowerCase();
+      if(!nombre) continue;
+      const tipo = tipoTxt.startsWith("egr") ? "egreso" : "ingreso";
+      if(existentesPorNombre[nombre]){
+        await db.collection('profesionales').doc(existentesPorNombre[nombre]).update({nombre, tipo});
+        actualizados++;
+      } else {
+        await db.collection('profesionales').add({nombre, tipo});
+        creados++;
+      }
+    }
+    info.textContent = `Listo: ${creados} nuevos, ${actualizados} actualizados.`;
+  }catch(err){
+    info.textContent = "Error al importar: " + err.message;
+  }
+  e.target.value = "";
+});
+
 /* =====================================================================
-   PANEL "CONCEPTOS" (admin) — reasignar profesional/área y código
+   PANEL "CONCEPTOS" (admin) — área, código y concepto (en ese orden)
    ===================================================================== */
 const overlayConceptos = document.getElementById('overlayConceptos');
 const buscarConceptoInput = document.getElementById('buscarConceptoInput');
+let mostrarNuevoConcepto = false;
 
 document.getElementById('btnConceptosPanel').onclick = ()=>{
   buscarConceptoInput.value = "";
+  mostrarNuevoConcepto = false;
   renderConceptosBusqueda();
-  overlayConceptosPanel_show();
+  overlayConceptos.classList.add('show');
 };
-function overlayConceptosPanel_show(){ overlayConceptos.classList.add('show'); }
 document.getElementById('closeConceptos').onclick = ()=> overlayConceptos.classList.remove('show');
 document.getElementById('cerrarConceptos').onclick = ()=> overlayConceptos.classList.remove('show');
+document.getElementById('btnNuevoConcepto').onclick = ()=>{
+  mostrarNuevoConcepto = !mostrarNuevoConcepto;
+  renderConceptosBusqueda();
+};
 buscarConceptoInput.addEventListener('input', renderConceptosBusqueda);
 
 function todosLosConceptos(){
@@ -2108,25 +2351,49 @@ function todosLosConceptos(){
   return lista.sort((a,b)=> a.profesional.localeCompare(b.profesional,'es') || (a.codigo||"").localeCompare(b.codigo||"",'es',{numeric:true}));
 }
 
-function renderConceptosBusqueda(){
-  const q = buscarConceptoInput.value.trim().toLowerCase();
-  const cont = document.getElementById('conceptosScroll');
+function filaConceptoHTML(c, esNueva){
   const opcionesProf = Object.keys(CONCEPTOS).sort();
-  const lista = todosLosConceptos().filter(c=> !q ||
-    c.profesional.toLowerCase().includes(q) || c.concepto.toLowerCase().includes(q) || (c.codigo||"").toLowerCase().includes(q)
-  );
-  if(!lista.length){ cont.innerHTML = '<div class="empty-state">No encontré conceptos con esa búsqueda.</div>'; return; }
-  cont.innerHTML = lista.map(c=>`
-    <div class="fila-editable" data-profesional-original="${c.profesional}" data-concepto-original="${c.concepto}">
+  return `
+    <div class="fila-editable" data-profesional-original="${c.profesional||''}" data-concepto-original="${c.concepto||''}">
       <select class="col-chico cc-profesional">
         ${opcionesProf.map(p=>`<option value="${p}" ${p===c.profesional?'selected':''}>${p}</option>`).join('')}
       </select>
-      <input type="text" class="col cc-concepto" value="${c.concepto}" placeholder="Concepto">
       <input type="text" class="col-chico cc-codigo" value="${c.codigo||""}" placeholder="Código">
-      <button class="btn-guardar-fila" onclick="guardarConceptoFila(this)">Guardar</button>
+      <input type="text" class="col cc-concepto" value="${c.concepto||""}" placeholder="Concepto">
+      <button class="btn-guardar-fila" onclick="${esNueva ? 'crearConceptoFila(this)' : 'guardarConceptoFila(this)'}">${esNueva ? "Crear" : "Guardar"}</button>
+      ${esNueva ? "" : `<button class="btn-eliminar-fila" onclick="eliminarConceptoFila(this)" title="Eliminar">✕</button>`}
     </div>
-  `).join('');
+  `;
 }
+
+function renderConceptosBusqueda(){
+  const q = buscarConceptoInput.value.trim().toLowerCase();
+  const cont = document.getElementById('conceptosScroll');
+  const lista = todosLosConceptos().filter(c=> !q ||
+    c.profesional.toLowerCase().includes(q) || c.concepto.toLowerCase().includes(q) || (c.codigo||"").toLowerCase().includes(q)
+  );
+  const nuevaFila = mostrarNuevoConcepto ? filaConceptoHTML({profesional: Object.keys(CONCEPTOS).sort()[0]||""}, true) : "";
+  if(!lista.length && !nuevaFila){ cont.innerHTML = '<div class="empty-state">No encontré conceptos con esa búsqueda.</div>'; return; }
+  cont.innerHTML = nuevaFila + lista.map(c=> filaConceptoHTML(c, false)).join('');
+}
+
+async function crearConceptoFila(btn){
+  const fila = btn.closest('.fila-editable');
+  const profesional = fila.querySelector('.cc-profesional').value;
+  const concepto = fila.querySelector('.cc-concepto').value.trim();
+  const codigo = fila.querySelector('.cc-codigo').value.trim();
+  if(!profesional){ alert("Elegí un profesional/área (creá uno primero en Profesionales/Áreas si no existe)."); return; }
+  if(!concepto){ alert("El concepto no puede quedar vacío."); return; }
+  btn.disabled = true; btn.textContent = "Creando…";
+  try{
+    await db.collection('conceptos').add({profesional, concepto, codigo});
+    mostrarNuevoConcepto = false;
+  }catch(e){
+    alert("No se pudo crear: " + e.message);
+    btn.disabled = false; btn.textContent = "Crear";
+  }
+}
+window.crearConceptoFila = crearConceptoFila;
 
 async function guardarConceptoFila(btn){
   const fila = btn.closest('.fila-editable');
@@ -2153,6 +2420,63 @@ async function guardarConceptoFila(btn){
   }
 }
 window.guardarConceptoFila = guardarConceptoFila;
+
+async function eliminarConceptoFila(btn){
+  const fila = btn.closest('.fila-editable');
+  const profOriginal = fila.dataset.profesionalOriginal;
+  const conceptoOriginal = fila.dataset.conceptoOriginal;
+  if(!confirm(`¿Eliminar el concepto "${conceptoOriginal}"? Esta acción no se puede deshacer.`)) return;
+  btn.disabled = true;
+  try{
+    const snap = await db.collection('conceptos')
+      .where('profesional','==', profOriginal)
+      .where('concepto','==', conceptoOriginal)
+      .limit(1).get();
+    if(snap.empty){ throw new Error("No encontré el concepto en la base."); }
+    await snap.docs[0].ref.delete();
+  }catch(e){
+    alert("No se pudo eliminar: " + e.message);
+    btn.disabled = false;
+  }
+}
+window.eliminarConceptoFila = eliminarConceptoFila;
+
+document.getElementById('btnExportarConceptos').onclick = ()=>{
+  const filas = todosLosConceptos().map(c=> ({
+    "Área": c.profesional,
+    "Código": c.codigo || "",
+    "Concepto": c.concepto,
+  }));
+  const ws = XLSX.utils.json_to_sheet(filas);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Conceptos");
+  XLSX.writeFile(wb, "conceptos.xlsx");
+};
+
+document.getElementById('inpImportarConceptos').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const info = document.getElementById('importarConceptosInfo');
+  info.textContent = "Leyendo archivo…";
+  try{
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data);
+    const filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+    let creados = 0, ignorados = 0;
+    for(const fila of filas){
+      const profesional = (fila["Área"] || fila["Area"] || fila["Profesional"] || "").toString().trim();
+      const codigo = (fila["Código"] || fila["Codigo"] || "").toString().trim();
+      const concepto = (fila["Concepto"] || "").toString().trim();
+      if(!profesional || !concepto){ ignorados++; continue; }
+      await db.collection('conceptos').add({profesional, concepto, codigo});
+      creados++;
+    }
+    info.textContent = `Listo: ${creados} conceptos agregados` + (ignorados ? ` (se ignoraron ${ignorados} filas sin área o concepto)` : "") + `. Si algún nombre ya existía, quedó duplicado — revisalo en el panel.`;
+  }catch(err){
+    info.textContent = "Error al importar: " + err.message;
+  }
+  e.target.value = "";
+});
 </script>
 </body>
 </html>
