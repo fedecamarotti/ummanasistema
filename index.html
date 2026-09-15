@@ -205,7 +205,7 @@
   }
   .ac-dropdown.show{display:block;}
   .ac-option{padding:8px 12px;font-size:12px;cursor:pointer;}
-  .ac-option:hover{background:#f1f1f8;}
+  .ac-option:hover, .ac-option.activo{background:#f1f1f8;}
   .ac-empty{padding:8px 12px;font-size:11px;color:var(--muted);}
   .filterbar .ac-wrap{min-width:170px;flex:1;}
   .combo .ac-wrap{flex:1;}
@@ -1106,25 +1106,60 @@ function attachAutocomplete(input, getOptions, onPick){
   dd.className = 'ac-dropdown';
   wrap.appendChild(dd);
   let suppressOpen = false;
+  let opcionesActuales = [];
+  let indiceActivo = -1;
+
+  function pintarActivo(){
+    dd.querySelectorAll('.ac-option').forEach((el,i)=>{
+      el.classList.toggle('activo', i===indiceActivo);
+      if(i===indiceActivo) el.scrollIntoView({block:'nearest'});
+    });
+  }
+
   function renderList(){
     if(suppressOpen){ suppressOpen = false; return; }
     const q = input.value.trim().toLowerCase();
-    const opts = getOptions().filter(o=> !q || o.toLowerCase().includes(q));
-    dd.innerHTML = opts.length
-      ? opts.slice(0,40).map(o=>`<div class="ac-option">${o}</div>`).join('')
+    opcionesActuales = getOptions().filter(o=> !q || o.toLowerCase().includes(q)).slice(0,40);
+    indiceActivo = -1;
+    dd.innerHTML = opcionesActuales.length
+      ? opcionesActuales.map(o=>`<div class="ac-option">${o}</div>`).join('')
       : '<div class="ac-empty">Sin resultados</div>';
     dd.classList.add('show');
   }
-  input.addEventListener('focus', renderList);
-  input.addEventListener('input', renderList);
-  dd.addEventListener('mousedown', (e)=>{
-    const opt = e.target.closest('.ac-option');
-    if(!opt) return;
-    input.value = opt.textContent;
+
+  function elegir(valor){
+    input.value = valor;
     dd.classList.remove('show');
     suppressOpen = true;
     input.dispatchEvent(new Event('input', {bubbles:true}));
-    if(onPick) onPick(opt.textContent);
+    if(onPick) onPick(valor);
+  }
+
+  input.addEventListener('focus', renderList);
+  input.addEventListener('input', renderList);
+  input.addEventListener('keydown', (e)=>{
+    if(!dd.classList.contains('show') || !opcionesActuales.length) return;
+    if(e.key === 'ArrowDown'){
+      e.preventDefault();
+      indiceActivo = Math.min(indiceActivo+1, opcionesActuales.length-1);
+      pintarActivo();
+    } else if(e.key === 'ArrowUp'){
+      e.preventDefault();
+      indiceActivo = Math.max(indiceActivo-1, 0);
+      pintarActivo();
+    } else if(e.key === 'Enter'){
+      if(indiceActivo >= 0){
+        e.preventDefault();
+        elegir(opcionesActuales[indiceActivo]);
+      }
+    } else if(e.key === 'Escape'){
+      dd.classList.remove('show');
+    }
+  });
+  dd.addEventListener('mousedown', (e)=>{
+    const opt = e.target.closest('.ac-option');
+    if(!opt) return;
+    elegir(opt.textContent);
   });
   document.addEventListener('click', (e)=>{ if(!wrap.contains(e.target)) dd.classList.remove('show'); });
 }
@@ -1464,6 +1499,8 @@ function abrirEdicion(id){
 
   document.getElementById('pagosLista').innerHTML = "";
   pagosDe(m).forEach(p=> agregarFilaPago(p.valor, p.medio));
+  const pagosIniciales = pagosDe(m);
+  montoAutoSync = pagosIniciales.length===1 ? String(pagosIniciales[0].valor) : null;
 
   inpValor.value = Number(m.valor).toLocaleString('es-AR');
   overlay.classList.add('show');
@@ -1474,6 +1511,7 @@ document.getElementById('closeModal').onclick = cerrarModal;
 document.getElementById('cancelMov').onclick = cerrarModal;
 function cerrarModal(){ overlay.classList.remove('show'); resetModal(); }
 function resetModal(){
+  montoAutoSync = null;
   selPaciente.value = "";
   document.getElementById('inpDestinatario').value = "";
   document.getElementById('campoPacienteIngreso').classList.remove('col-hidden');
@@ -1569,9 +1607,20 @@ document.querySelectorAll('.currency-toggle button').forEach(btn=>{
     monedaSel = btn.dataset.cur;
   };
 });
+let montoAutoSync = null; // último monto que autocompletamos en el primer pago, para saber si el usuario lo tocó
 inpValor.addEventListener('input', ()=>{
   let raw = inpValor.value.replace(/\D/g,"");
   inpValor.value = raw ? Number(raw).toLocaleString('es-AR') : "";
+
+  const filas = document.querySelectorAll('#pagosLista .pago-row');
+  if(filas.length === 1){
+    const montoInput = filas[0].querySelector('.pago-monto');
+    const valorActual = montoInput.value.replace(/\D/g,"");
+    if(!valorActual || valorActual === montoAutoSync){
+      montoInput.value = raw ? Number(raw).toLocaleString('es-AR') : "";
+      montoAutoSync = raw;
+    }
+  }
 });
 
 
