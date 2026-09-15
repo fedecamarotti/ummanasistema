@@ -269,6 +269,8 @@
   .pago-row{display:flex;gap:8px;margin-bottom:8px;align-items:center;}
   .pago-row input{flex:1;min-width:0;}
   .pago-row select{flex:1;min-width:0;}
+  .pago-row .pago-quien{flex:1.3;min-width:0;font-size:10.5px;}
+  #pagosLista.oculta-quien .pago-quien{display:none;}
   .pago-row .btn-quitar{
     flex:none;width:32px;height:34px;border:1px solid var(--border);background:#fff;
     border-radius:8px;color:#c62828;font-size:14px;
@@ -878,8 +880,8 @@ function fmtMonto(valor, moneda){
 // movimientos viejos que todavía tienen un solo medio/valor a nivel raíz
 // (antes de que existiera el reparto en varios pagos).
 function pagosDe(m){
-  if(m.pagos && m.pagos.length) return m.pagos;
-  if(m.medio) return [{medio: m.medio, valor: m.valor, saldada: !!m.saldada, fechaSaldadoISO: m.fechaSaldadoISO||null, fechaSaldadoDisplay: m.fechaSaldadoDisplay||null}];
+  if(m.pagos && m.pagos.length) return m.pagos.map(p=> ({cobradoPor: 'ummana', ...p}));
+  if(m.medio) return [{medio: m.medio, valor: m.valor, saldada: !!m.saldada, fechaSaldadoISO: m.fechaSaldadoISO||null, fechaSaldadoDisplay: m.fechaSaldadoDisplay||null, cobradoPor: 'ummana'}];
   return [];
 }
 function medioLabelDe(medio, moneda){
@@ -1231,8 +1233,11 @@ function calcularEsperadoCaja(){
   let ingresos = 0, egresos = 0;
   movimientosHoy.forEach(m=>{
     if(m.moneda !== "$") return;
+    const esGasto = esEgreso(m.prof);
     pagosDe(m).filter(p=>p.medio==="efectivo").forEach(p=>{
-      if(esEgreso(m.prof)) egresos += p.valor; else ingresos += p.valor;
+      // Si lo cobró el profesional directamente, esa plata nunca entró a nuestra caja física.
+      if(!esGasto && p.cobradoPor === "profesional") return;
+      if(esGasto) egresos += p.valor; else ingresos += p.valor;
     });
   });
   return cajaActual.aperturaMonto + ingresos - egresos;
@@ -1387,12 +1392,16 @@ function opcionesMedioHTML(seleccion){
     `<option value="${o.value}" ${o.value===seleccion?"selected":""}>${o.label}</option>`
   ).join('');
 }
-function agregarFilaPago(monto, medio){
+function agregarFilaPago(monto, medio, cobradoPor){
   const row = document.createElement('div');
   row.className = 'pago-row';
   row.innerHTML = `
     <input type="text" class="pago-monto" inputmode="numeric" placeholder="Monto">
     <select class="pago-medio">${opcionesMedioHTML(medio||"")}</select>
+    <select class="pago-quien">
+      <option value="ummana" ${cobradoPor!=='profesional'?'selected':''}>Cobra Ummana</option>
+      <option value="profesional" ${cobradoPor==='profesional'?'selected':''}>Cobra el profesional</option>
+    </select>
     <button type="button" class="btn-quitar" title="Quitar">✕</button>
   `;
   const inp = row.querySelector('.pago-monto');
@@ -1401,6 +1410,18 @@ function agregarFilaPago(monto, medio){
     let raw = inp.value.replace(/\D/g,"");
     inp.value = raw ? Number(raw).toLocaleString('es-AR') : "";
   });
+  const selMedio = row.querySelector('.pago-medio');
+  const selQuien = row.querySelector('.pago-quien');
+  function sincronizarQuienSegunMedio(){
+    if(selMedio.value === 'debe'){
+      selQuien.value = 'ummana';
+      selQuien.disabled = true;
+    } else {
+      selQuien.disabled = false;
+    }
+  }
+  selMedio.addEventListener('change', sincronizarQuienSegunMedio);
+  sincronizarQuienSegunMedio();
   row.querySelector('.btn-quitar').onclick = ()=> row.remove();
   document.getElementById('pagosLista').appendChild(row);
 }
@@ -1412,7 +1433,8 @@ function leerPagosForm(){
   document.querySelectorAll('#pagosLista .pago-row').forEach(row=>{
     const monto = Number(row.querySelector('.pago-monto').value.replace(/\D/g,""));
     const medio = row.querySelector('.pago-medio').value;
-    if(monto>0 && medio) pagos.push({medio, valor: monto, saldada:false, fechaSaldadoISO:null, fechaSaldadoDisplay:null});
+    const cobradoPor = medio === 'debe' ? 'ummana' : row.querySelector('.pago-quien').value;
+    if(monto>0 && medio) pagos.push({medio, valor: monto, cobradoPor, saldada:false, fechaSaldadoISO:null, fechaSaldadoDisplay:null});
   });
   return pagos;
 }
@@ -1444,6 +1466,7 @@ function actualizarCampoPacienteSegunTipo(){
   const egreso = esEgreso(selProfesional.value);
   document.getElementById('campoPacienteIngreso').classList.toggle('col-hidden', egreso);
   document.getElementById('campoPacienteEgreso').classList.toggle('col-hidden', !egreso);
+  document.getElementById('pagosLista').classList.toggle('oculta-quien', egreso);
   if(egreso){
     document.getElementById('deudasPacienteBox').classList.add('col-hidden');
   } else {
@@ -1505,7 +1528,7 @@ function abrirEdicion(id){
   monedaSel = m.moneda;
 
   document.getElementById('pagosLista').innerHTML = "";
-  pagosDe(m).forEach(p=> agregarFilaPago(p.valor, p.medio));
+  pagosDe(m).forEach(p=> agregarFilaPago(p.valor, p.medio, p.cobradoPor));
   const pagosIniciales = pagosDe(m);
   montoAutoSync = pagosIniciales.length===1 ? String(pagosIniciales[0].valor) : null;
 
@@ -1534,6 +1557,7 @@ function resetModal(){
   document.querySelector('.currency-toggle button[data-cur="$"]').classList.add('active');
   monedaSel = "$";
   document.getElementById('pagosLista').innerHTML = "";
+  document.getElementById('pagosLista').classList.remove('oculta-quien');
   agregarFilaPago();
   document.getElementById('cardNuevoPaciente').classList.add('col-hidden');
   document.getElementById('deudasPacienteBox').classList.add('col-hidden');
@@ -1786,8 +1810,14 @@ function generarPDFReporteDiario(filas, fechaISO){
   let totalPesosIn=0, totalUsdIn=0, totalPesosOut=0, totalUsdOut=0;
   filas.forEach(m=>{
     const esGasto = esEgreso(m.prof);
-    if(m.moneda==="USD"){ esGasto ? totalUsdOut+=m.valor : totalUsdIn+=m.valor; }
-    else { esGasto ? totalPesosOut+=m.valor : totalPesosIn+=m.valor; }
+    if(esGasto){
+      if(m.moneda==="USD") totalUsdOut+=m.valor; else totalPesosOut+=m.valor;
+    } else {
+      pagosDe(m).forEach(p=>{
+        if(p.cobradoPor === "profesional") return;
+        if(m.moneda==="USD") totalUsdIn+=p.valor; else totalPesosIn+=p.valor;
+      });
+    }
   });
   let y = doc.lastAutoTable.finalY + 24;
   doc.setFontSize(10);
@@ -1837,17 +1867,30 @@ async function refreshPagoPreview(){
     preview.innerHTML = '<div class="empty-state">Sin movimientos de este profesional en esa fecha.</div>';
     btnExp.disabled = true; return;
   }
-  let totalPesos=0, totalUsd=0;
-  pagoMovsActuales.forEach(m=> m.moneda==="USD" ? totalUsd+=m.valor : totalPesos+=m.valor);
+  let totalPesos=0, totalUsd=0, profPesos=0, profUsd=0, ummPesos=0, ummUsd=0;
+  const lineas = [];
+  pagoMovsActuales.forEach(m=>{
+    pagosDe(m).forEach(p=>{
+      lineas.push({pac:m.pac, concepto:m.concepto, notas:m.notas, moneda:m.moneda, valor:p.valor, cobradoPor:p.cobradoPor||'ummana'});
+      const esUsd = m.moneda==="USD";
+      if(esUsd) totalUsd+=p.valor; else totalPesos+=p.valor;
+      if(p.cobradoPor==="profesional"){ esUsd ? profUsd+=p.valor : profPesos+=p.valor; }
+      else { esUsd ? ummUsd+=p.valor : ummPesos+=p.valor; }
+    });
+  });
   preview.innerHTML = `
     <div class="deudores-summary">
-      ${totalPesos>0 ? `<div class="chip" style="background:#e3f1de;border-color:#c6e3ba;color:#2f7a2f;">A pagar en $ : $${totalPesos.toLocaleString('es-AR')}</div>` : ""}
-      ${totalUsd>0 ? `<div class="chip" style="background:#e3f1de;border-color:#c6e3ba;color:#2f7a2f;">A pagar en USD : US$ ${totalUsd.toLocaleString('es-AR')}</div>` : ""}
+      ${totalPesos>0 ? `<div class="chip" style="background:#eef1ff;border-color:#d9dcff;color:#4842c9;">Total del día $ : $${totalPesos.toLocaleString('es-AR')}</div>` : ""}
+      ${totalUsd>0 ? `<div class="chip" style="background:#eef1ff;border-color:#d9dcff;color:#4842c9;">Total del día USD : US$ ${totalUsd.toLocaleString('es-AR')}</div>` : ""}
+      ${profPesos>0 ? `<div class="chip" style="background:#f4f4f6;border-color:#e7e7ea;color:#5f6368;">Cobrado por el profesional $ : $${profPesos.toLocaleString('es-AR')}</div>` : ""}
+      ${profUsd>0 ? `<div class="chip" style="background:#f4f4f6;border-color:#e7e7ea;color:#5f6368;">Cobrado por el profesional USD : US$ ${profUsd.toLocaleString('es-AR')}</div>` : ""}
+      ${ummPesos>0 ? `<div class="chip" style="background:#e3f1de;border-color:#c6e3ba;color:#2f7a2f;">A pagar (cobrado por Ummana) $ : $${ummPesos.toLocaleString('es-AR')}</div>` : ""}
+      ${ummUsd>0 ? `<div class="chip" style="background:#e3f1de;border-color:#c6e3ba;color:#2f7a2f;">A pagar (cobrado por Ummana) USD : US$ ${ummUsd.toLocaleString('es-AR')}</div>` : ""}
     </div>
-    ${pagoMovsActuales.map(m=>`
+    ${lineas.map(l=>`
       <div class="deuda-row">
-        <div class="deuda-info"><span class="nom">${m.pac}</span><span class="det">${m.concepto}${m.notas ? " · " + m.notas : ""}</span></div>
-        <span class="deuda-total" style="color:#2f7a2f;">${fmtTotal(m)}</span>
+        <div class="deuda-info"><span class="nom">${l.pac}</span><span class="det">${l.concepto}${l.notas ? " · " + l.notas : ""} — ${l.cobradoPor==='profesional' ? 'cobró el profesional' : 'cobró Ummana'}</span></div>
+        <span class="deuda-total" style="color:${l.cobradoPor==='profesional' ? '#5f6368' : '#2f7a2f'};">${fmtMonto(l.valor, l.moneda)}</span>
       </div>
     `).join('')}
   `;
@@ -1860,6 +1903,12 @@ document.getElementById('btnExportarPago').onclick = ()=>{
   const prof = selProfesionalPago.value;
   const fechaISO = inpFechaPago.value;
   if(!pagoMovsActuales.length) return;
+
+  const lineas = [];
+  pagoMovsActuales.forEach(m=>{
+    pagosDe(m).forEach(p=> lineas.push({pac:m.pac, concepto:m.concepto, notas:m.notas, moneda:m.moneda, valor:p.valor, cobradoPor:p.cobradoPor||'ummana'}));
+  });
+
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({orientation:'landscape', unit:'pt', format:'a4'});
   doc.setFont('helvetica','bold'); doc.setFontSize(14);
@@ -1868,19 +1917,27 @@ document.getElementById('btnExportarPago').onclick = ()=>{
   const [y_,m_,d_] = fechaISO.split('-');
   doc.text(`${d_}/${m_}/${y_}`, 40, 58);
 
-  const body = pagoMovsActuales.map(m=>[m.pac, m.concepto, m.notas||"", fmtTotal(m), medioDisplayText(m)]);
+  const body = lineas.map(l=>[l.pac, l.concepto, l.notas||"", fmtMonto(l.valor, l.moneda), l.cobradoPor==='profesional' ? "Cobró el profesional" : "Cobró Ummana"]);
   doc.autoTable({
-    startY: 72, head: [["Paciente/Alumno","Concepto","Notas","Total","Medio de pago"]], body,
+    startY: 72, head: [["Paciente/Alumno","Concepto","Notas","Monto","¿Quién cobró?"]], body,
     styles:{font:'helvetica', fontSize:9, cellPadding:5}, headStyles:{fillColor:[111,106,248], textColor:255},
     alternateRowStyles:{fillColor:[247,247,250]},
   });
 
-  let totalPesos=0, totalUsd=0;
-  pagoMovsActuales.forEach(m=> m.moneda==="USD" ? totalUsd+=m.valor : totalPesos+=m.valor);
-  let y = doc.lastAutoTable.finalY + 26;
+  let totalPesos=0, totalUsd=0, profPesos=0, profUsd=0, ummPesos=0, ummUsd=0;
+  lineas.forEach(l=>{
+    const esUsd = l.moneda==="USD";
+    if(esUsd) totalUsd+=l.valor; else totalPesos+=l.valor;
+    if(l.cobradoPor==="profesional"){ esUsd ? profUsd+=l.valor : profPesos+=l.valor; }
+    else { esUsd ? ummUsd+=l.valor : ummPesos+=l.valor; }
+  });
+
+  let y = doc.lastAutoTable.finalY + 24;
+  doc.setFontSize(10);
+  if(totalPesos || totalUsd){ doc.text(`Total del día: $ ${totalPesos.toLocaleString('es-AR')}   ·   US$ ${totalUsd.toLocaleString('es-AR')}`, 40, y); y+=16; }
+  if(profPesos || profUsd){ doc.text(`Cobrado por el profesional: $ ${profPesos.toLocaleString('es-AR')}   ·   US$ ${profUsd.toLocaleString('es-AR')}`, 40, y); y+=16; }
   doc.setFont('helvetica','bold'); doc.setFontSize(12);
-  if(totalPesos>0){ doc.text(`Total a pagar: $ ${totalPesos.toLocaleString('es-AR')}`, 40, y); y+=18; }
-  if(totalUsd>0){ doc.text(`Total a pagar: US$ ${totalUsd.toLocaleString('es-AR')}`, 40, y); }
+  doc.text(`A pagar (cobrado por Ummana): $ ${ummPesos.toLocaleString('es-AR')}   ·   US$ ${ummUsd.toLocaleString('es-AR')}`, 40, y);
   doc.save(`pago-${prof.replace(/[^a-z0-9]+/gi,'-')}-${fechaISO}.pdf`);
 };
 
@@ -1923,8 +1980,14 @@ document.getElementById('btnGenerarInforme').onclick = async ()=>{
     let ingresosPesos=0, egresosPesos=0, ingresosUsd=0, egresosUsd=0;
     filas.forEach(m=>{
       const out = esEgreso(m.prof);
-      if(m.moneda==="USD"){ out ? egresosUsd+=m.valor : ingresosUsd+=m.valor; }
-      else { out ? egresosPesos+=m.valor : ingresosPesos+=m.valor; }
+      if(out){
+        if(m.moneda==="USD") egresosUsd+=m.valor; else egresosPesos+=m.valor;
+      } else {
+        pagosDe(m).forEach(p=>{
+          if(p.cobradoPor === "profesional") return; // esa plata no la manejó Ummana
+          if(m.moneda==="USD") ingresosUsd+=p.valor; else ingresosPesos+=p.valor;
+        });
+      }
     });
 
     document.getElementById('kpiRow').innerHTML = `
