@@ -102,7 +102,8 @@
   td.codigo{color:var(--muted);font-size:10px;}
   td.notas{color:#5b5e66;font-size:10.5px;max-width:180px;white-space:normal;}
   td.total{font-weight:700;font-size:11px;}
-  td.total.gasto{background:#fdf1f1;color:#a13a3a;}
+  td.total.ingreso{background:#e3f1de;color:#2f7a2f;}
+  td.total.egreso{background:#fbeaea;color:#a13a3a;}
   tbody tr:hover td{filter:brightness(0.98);}
 
   .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap;}
@@ -217,16 +218,24 @@
   .gate-card p{margin:0 0 18px;font-size:12px;color:var(--muted);line-height:1.5;}
   .gate-card .btn-primary{padding:10px 22px;}
 
-  .pacientes-scroll{
-    display:flex;gap:12px;overflow-x:auto;padding:8px 2px 16px;
+  .lista-rows{
+    max-height:480px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;
   }
-  .paciente-card{
-    flex:0 0 220px;border:1px solid var(--border);border-radius:12px;
-    padding:14px;background:#fafafc;
+  .fila-editable{
+    display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);
+    flex-wrap:wrap;
   }
-  .paciente-card .field{margin-bottom:10px;}
-  .paciente-card label{font-size:9.5px;}
-  .paciente-card input{padding:7px 9px;font-size:11.5px;}
+  .fila-editable:last-child{border-bottom:none;}
+  .fila-editable input, .fila-editable select{padding:6px 8px;font-size:11px;}
+  .fila-editable .col{flex:1;min-width:110px;}
+  .fila-editable .col-chico{flex:0 0 90px;}
+  .fila-editable .btn-guardar-fila{
+    flex:0 0 auto;padding:6px 12px;font-size:11px;font-weight:700;
+    background:var(--accent);color:#fff;border:1px solid var(--accent);border-radius:7px;
+  }
+  .fila-editable .btn-guardar-fila:hover{background:var(--accent-dk);}
+  .lista-toolbar{display:flex;gap:8px;margin-bottom:10px;align-items:center;}
+  .lista-toolbar input[type=text]{flex:1;}
 
   .pago-row{display:flex;gap:8px;margin-bottom:8px;align-items:center;}
   .pago-row input{flex:1;min-width:0;}
@@ -292,6 +301,8 @@
     <button class="btn col-hidden" id="btnInformes">Informes</button>
     <button class="btn col-hidden" id="btnImportar">Importar catálogo</button>
     <button class="btn col-hidden" id="btnCajas">Cajas</button>
+    <button class="btn col-hidden" id="btnProfesionalesPanel">Profesionales/Área</button>
+    <button class="btn col-hidden" id="btnConceptosPanel">Conceptos</button>
     <button class="btn btn-primary" id="btnNuevo">+ Nuevo movimiento</button>
     <button class="btn" id="btnLogout">Salir</button>
   </div>
@@ -387,7 +398,7 @@
     <h2>Nuevo movimiento</h2>
     <div class="modal-sub">Se agrega con la fecha de hoy, <span id="fechaModal"></span></div>
 
-    <div class="field">
+    <div class="field" id="campoPacienteIngreso">
       <label>Paciente / Alumno</label>
       <div class="combo">
         <div class="ac-wrap">
@@ -395,6 +406,11 @@
         </div>
         <button class="addbtn" id="btnAddPaciente" title="Agregar nuevo paciente">+</button>
       </div>
+    </div>
+
+    <div class="field col-hidden" id="campoPacienteEgreso">
+      <label>Destinatario / Proveedor <span class="opt">(a quién se le paga)</span></label>
+      <input type="text" id="inpDestinatario" placeholder="Ej: Inmobiliaria Pérez, Sueldo Mariana…">
     </div>
 
     <div class="field col-hidden" id="deudasPacienteBox">
@@ -432,7 +448,9 @@
 
     <div class="field">
       <label>Profesional / Área</label>
-      <select id="selProfesional"><option value="">Seleccionar…</option></select>
+      <div class="ac-wrap">
+        <input type="text" id="selProfesional" placeholder="Escribí para buscar…" autocomplete="off">
+      </div>
     </div>
 
     <div class="field">
@@ -471,6 +489,23 @@
         <button class="btn" id="cancelMov">Cancelar</button>
         <button class="btn btn-primary" id="guardarMov">Guardar movimiento</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: FECHA DEL REPORTE DIARIO ============ -->
+<div class="overlay" id="overlayReporteFecha">
+  <div class="modal">
+    <button class="close-x" id="closeReporteFecha">✕</button>
+    <h2>Reporte diario</h2>
+    <div class="modal-sub">Elegí de qué fecha querés exportar los movimientos.</div>
+    <div class="field">
+      <label>Fecha</label>
+      <input type="date" id="inpFechaReporte">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="cancelReporteFecha">Cancelar</button>
+      <button class="btn btn-primary" id="generarReporteFecha">Generar PDF</button>
     </div>
   </div>
 </div>
@@ -532,13 +567,45 @@
   <div class="modal" style="max-width:1100px;">
     <button class="close-x" id="closePacientes">✕</button>
     <h2>Pacientes</h2>
-    <div class="modal-sub">Buscá por apellido o nombre para ver y editar sus datos.</div>
-    <div class="field">
+    <div class="modal-sub">Orden alfabético — escribí para filtrar por apellido o nombre.</div>
+    <div class="lista-toolbar">
       <input type="text" id="buscarPacienteInput" placeholder="Buscar por apellido o nombre…" autocomplete="off">
     </div>
-    <div class="pacientes-scroll" id="pacientesScroll"></div>
+    <div class="lista-rows" id="pacientesScroll"></div>
     <div class="modal-actions">
       <button class="btn" id="cerrarPacientes">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: PROFESIONALES / ÁREA (buscar y editar) ============ -->
+<div class="overlay" id="overlayProfesionalesPanel">
+  <div class="modal" style="max-width:900px;">
+    <button class="close-x" id="closeProfesionalesPanel">✕</button>
+    <h2>Profesionales / Área</h2>
+    <div class="modal-sub">Orden alfabético — definí si cada uno es ingreso o egreso. Esto determina cómo se carga el movimiento (paciente o destinatario) y de qué color se ve el total.</div>
+    <div class="lista-toolbar">
+      <input type="text" id="buscarProfesionalInput" placeholder="Buscar profesional/área…" autocomplete="off">
+    </div>
+    <div class="lista-rows" id="profesionalesScroll"></div>
+    <div class="modal-actions">
+      <button class="btn" id="cerrarProfesionalesPanel">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: CONCEPTOS (buscar y editar) ============ -->
+<div class="overlay" id="overlayConceptos">
+  <div class="modal" style="max-width:1000px;">
+    <button class="close-x" id="closeConceptos">✕</button>
+    <h2>Conceptos</h2>
+    <div class="modal-sub">Escribí para buscar por profesional, concepto o código.</div>
+    <div class="lista-toolbar">
+      <input type="text" id="buscarConceptoInput" placeholder="Buscar…" autocomplete="off">
+    </div>
+    <div class="lista-rows" id="conceptosScroll"></div>
+    <div class="modal-actions">
+      <button class="btn" id="cerrarConceptos">Cerrar</button>
     </div>
   </div>
 </div>
@@ -636,6 +703,8 @@ const db = firebase.firestore();
    ===================================================================== */
 let CONCEPTOS = {};              // { "SUEROTERAPIA": [{concepto, codigo}, ...], ... }
 let CODIGO_POR_CONCEPTO = {};    // "SUEROTERAPIA||SUERO BASE..." -> "SUE-01", para buscar el código al guardar
+let PROFESIONALES_TIPO = {};     // { "SUEROTERAPIA": "ingreso", "GASTOS": "egreso", ... }
+function esEgreso(prof){ return PROFESIONALES_TIPO[prof] === "egreso"; }
 
 const MEDIO_LABELS = {
   efectivo: (m)=> m.moneda==="USD" ? "Efectivo USD" : "Efectivo $",
@@ -731,7 +800,8 @@ function intentarLogin(){
 }
 document.getElementById('btnLogout').onclick = ()=> auth.signOut();
 
-let unsubMovimientos = null, unsubPacientes = null, unsubCajaAbierta = null, unsubHoy = null, unsubDeuda = null, unsubConceptos = null;
+let unsubMovimientos = null, unsubPacientes = null, unsubCajaAbierta = null, unsubHoy = null, unsubDeuda = null, unsubConceptos = null, unsubProfesionales = null;
+let profesionalesFullList = [];
 
 auth.onAuthStateChanged(async (user)=>{
   if(!user){
@@ -743,6 +813,7 @@ auth.onAuthStateChanged(async (user)=>{
     if(unsubHoy) unsubHoy();
     if(unsubDeuda) unsubDeuda();
     if(unsubConceptos) unsubConceptos();
+    if(unsubProfesionales) unsubProfesionales();
     return;
   }
   const doc = await db.collection('usuarios').doc(user.uid).get();
@@ -795,6 +866,8 @@ function aplicarRolUI(){
   document.getElementById('btnInformes').classList.toggle('col-hidden', !esAdmin);
   document.getElementById('btnImportar').classList.toggle('col-hidden', !esAdmin);
   document.getElementById('btnCajas').classList.toggle('col-hidden', !esAdmin);
+  document.getElementById('btnProfesionalesPanel').classList.toggle('col-hidden', !esAdmin);
+  document.getElementById('btnConceptosPanel').classList.toggle('col-hidden', !esAdmin);
 }
 
 /* =====================================================================
@@ -831,6 +904,17 @@ function iniciarListeners(){
       CODIGO_POR_CONCEPTO[c.profesional+"||"+c.concepto] = c.codigo||"";
     });
     poblarProfesionalesUI();
+    if(overlayConceptos.classList.contains('show')) renderConceptosBusqueda();
+  });
+
+  // Tipo (ingreso/egreso) de cada profesional/área
+  unsubProfesionales = db.collection('profesionales').onSnapshot(snap=>{
+    PROFESIONALES_TIPO = {};
+    profesionalesFullList = snap.docs.map(d=> ({id:d.id, ...d.data()}));
+    profesionalesFullList.forEach(p=> PROFESIONALES_TIPO[p.nombre] = p.tipo);
+    actualizarCampoPacienteSegunTipo();
+    renderTabla();
+    if(overlayProfesionales.classList.contains('show')) renderProfesionalesBusqueda();
   });
 
   // Movimientos del mes elegido (por defecto, el mes en curso)
@@ -849,7 +933,7 @@ function iniciarListeners(){
       const m = {id:d.id, ...d.data()};
       pagosDe(m).forEach((p, idx)=>{
         if(p.medio==="debe" && !p.saldada){
-          movimientosDeuda.push({movId:m.id, idx, pac:m.pac, concepto:m.concepto, notas:m.notas, fechaDisplay:m.fechaDisplay, moneda:m.moneda, valor:p.valor});
+          movimientosDeuda.push({movId:m.id, idx, pac:m.pac, prof:m.prof, concepto:m.concepto, notas:m.notas, fechaDisplay:m.fechaDisplay, moneda:m.moneda, valor:p.valor});
         }
       });
     });
@@ -944,7 +1028,7 @@ function pasaFiltros(m){
 function renderTabla(){
   tbody.innerHTML = "";
   movimientos.filter(pasaFiltros).forEach(m=>{
-    const esGasto = m.prof === "GASTOS";
+    const esGasto = esEgreso(m.prof);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="editcol"><button class="editbtn" title="Editar" onclick="abrirEdicion('${m.id}')">&#9998;</button></td>
@@ -954,7 +1038,7 @@ function renderTabla(){
       <td class="codigo">${m.codigo||""}</td>
       <td class="concepto">${m.concepto}</td>
       <td class="notas">${m.notas||""}</td>
-      <td class="total ${esGasto?'gasto':''}">${fmtTotal(m)}</td>
+      <td class="total ${esGasto?'egreso':'ingreso'}">${fmtTotal(m)}</td>
       <td class="badges-cell">${medioBadgesHTML(m)}</td>
     `;
     tbody.appendChild(tr);
@@ -974,7 +1058,7 @@ function calcularEsperadoCaja(){
   movimientosHoy.forEach(m=>{
     if(m.moneda !== "$") return;
     pagosDe(m).filter(p=>p.medio==="efectivo").forEach(p=>{
-      if(m.prof === "GASTOS") egresos += p.valor; else ingresos += p.valor;
+      if(esEgreso(m.prof)) egresos += p.valor; else ingresos += p.valor;
     });
   });
   return cajaActual.aperturaMonto + ingresos - egresos;
@@ -1159,24 +1243,46 @@ function leerPagosForm(){
   return pagos;
 }
 
-function poblarProfesionalesUI(){
-  const actual = selProfesional.value;
-  selProfesional.innerHTML = '<option value="">Seleccionar…</option>' +
-    Object.keys(CONCEPTOS).sort().map(p=>`<option>${p}</option>`).join('');
-  if(Object.keys(CONCEPTOS).includes(actual)){ selProfesional.value = actual; selProfesional.onchange(); }
+function ordenarConceptos(profesional, opts){
+  const copia = opts.slice();
+  if((profesional||"").trim().toUpperCase() === "CREMAS"){
+    copia.sort((a,b)=> a.concepto.localeCompare(b.concepto, 'es'));
+  } else {
+    copia.sort((a,b)=> (a.codigo||"").localeCompare((b.codigo||""), 'es', {numeric:true, sensitivity:'base'}));
+  }
+  return copia;
 }
-attachAutocomplete(selPaciente, ()=> pacienteRegistry);
 
-selProfesional.onchange = ()=>{
+function actualizarConceptosDesdeProfesional(){
   const opts = CONCEPTOS[selProfesional.value] || [];
   if(opts.length){
     selConcepto.disabled = false;
-    selConcepto.innerHTML = opts.map(c=>`<option value="${c.concepto}">${c.concepto}${c.codigo ? " — " + c.codigo : ""}</option>`).join('');
+    const ordenados = ordenarConceptos(selProfesional.value, opts);
+    selConcepto.innerHTML = ordenados.map(c=>`<option value="${c.concepto}">${c.concepto}${c.codigo ? " — " + c.codigo : ""}</option>`).join('');
   } else {
     selConcepto.disabled = true;
     selConcepto.innerHTML = '<option value="">Sin conceptos configurados</option>';
   }
-};
+  actualizarCampoPacienteSegunTipo();
+}
+
+function actualizarCampoPacienteSegunTipo(){
+  const egreso = esEgreso(selProfesional.value);
+  document.getElementById('campoPacienteIngreso').classList.toggle('col-hidden', egreso);
+  document.getElementById('campoPacienteEgreso').classList.toggle('col-hidden', !egreso);
+  if(egreso){
+    document.getElementById('deudasPacienteBox').classList.add('col-hidden');
+  } else {
+    refreshDeudasPaciente();
+  }
+}
+
+function poblarProfesionalesUI(){
+  actualizarConceptosDesdeProfesional();
+}
+attachAutocomplete(selPaciente, ()=> pacienteRegistry);
+attachAutocomplete(selProfesional, ()=> Object.keys(CONCEPTOS).sort());
+selProfesional.addEventListener('input', actualizarConceptosDesdeProfesional);
 
 document.getElementById('btnNuevo').onclick = ()=>{
   modo = 'nuevo'; editingId = null;
@@ -1195,8 +1301,9 @@ function abrirEdicion(id){
   btnEliminar.classList.remove('col-hidden');
 
   selPaciente.value = m.pac;
+  document.getElementById('inpDestinatario').value = m.pac;
   selProfesional.value = m.prof;
-  selProfesional.onchange();
+  actualizarConceptosDesdeProfesional();
   selConcepto.value = m.concepto;
   refreshDeudasPaciente();
 
@@ -1218,6 +1325,9 @@ document.getElementById('cancelMov').onclick = cerrarModal;
 function cerrarModal(){ overlay.classList.remove('show'); resetModal(); }
 function resetModal(){
   selPaciente.value = "";
+  document.getElementById('inpDestinatario').value = "";
+  document.getElementById('campoPacienteIngreso').classList.remove('col-hidden');
+  document.getElementById('campoPacienteEgreso').classList.add('col-hidden');
   selProfesional.value = "";
   selConcepto.innerHTML = '<option value="">Elegí primero un profesional/área…</option>';
   selConcepto.disabled = true;
@@ -1284,6 +1394,23 @@ function refreshDeudasPaciente(){
   `).join('');
 }
 
+document.getElementById('deudasPacienteLista').addEventListener('change', (e)=>{
+  if(!e.target.matches('input[name="saldarDeuda"]')) return;
+  const [movId, idxStr] = e.target.value.split('::');
+  const deuda = movimientosDeuda.find(d=> d.movId===movId && d.idx===Number(idxStr));
+  if(!deuda) return;
+  selProfesional.value = deuda.prof;
+  actualizarConceptosDesdeProfesional();
+  const conceptoSalda = `Salda deuda del ${deuda.fechaDisplay}`;
+  if(![...selConcepto.options].some(o=>o.value===conceptoSalda)){
+    const opt = document.createElement('option');
+    opt.value = conceptoSalda; opt.textContent = conceptoSalda;
+    selConcepto.insertBefore(opt, selConcepto.firstChild);
+  }
+  selConcepto.disabled = false;
+  selConcepto.value = conceptoSalda;
+});
+
 document.querySelectorAll('.currency-toggle button').forEach(btn=>{
   btn.onclick = ()=>{
     document.querySelectorAll('.currency-toggle button').forEach(b=>b.classList.remove('active'));
@@ -1298,7 +1425,9 @@ inpValor.addEventListener('input', ()=>{
 
 
 btnGuardarMov.onclick = async ()=>{
-  if(!selPaciente.value){ alert("Elegí un paciente/alumno."); return; }
+  const egreso = esEgreso(selProfesional.value);
+  const pacValor = egreso ? document.getElementById('inpDestinatario').value.trim() : selPaciente.value;
+  if(!pacValor){ alert(egreso ? "Ingresá a quién se le paga." : "Elegí un paciente/alumno."); return; }
   if(!selProfesional.value){ alert("Elegí un profesional/área."); return; }
   if(!selConcepto.value){ alert("Elegí un concepto."); return; }
   const valorNum = Number(inpValor.value.replace(/\D/g,""));
@@ -1313,7 +1442,7 @@ btnGuardarMov.onclick = async ()=>{
   if(sumaPagos < valorNum){
     pagos.push({medio:"debe", valor: valorNum - sumaPagos, saldada:false, fechaSaldadoISO:null, fechaSaldadoDisplay:null});
   }
-  if(selProfesional.value === "GASTOS" && pagos.some(p=>p.medio==="debe")){
+  if(egreso && pagos.some(p=>p.medio==="debe")){
     alert('Un gasto no puede quedar como "Debe" — revisá que los pagos cubran el total completo.');
     return;
   }
@@ -1327,7 +1456,7 @@ btnGuardarMov.onclick = async ()=>{
   if(modo==='editar'){
     if(!confirm("¿Está seguro de editar este registro? Esta opción no tiene vuelta atrás.")) return;
     const cambios = {
-      pac: selPaciente.value, prof: selProfesional.value, concepto: selConcepto.value, codigo,
+      pac: pacValor, prof: selProfesional.value, concepto: selConcepto.value, codigo,
       notas: document.getElementById('inpNotas').value, moneda: monedaSel, valor: valorNum,
       pagos, tieneDeudaPendiente: pendienteDeuda,
       actualizadoEn: firebase.firestore.FieldValue.serverTimestamp(),
@@ -1335,7 +1464,7 @@ btnGuardarMov.onclick = async ()=>{
     await db.collection('movimientos').doc(editingId).update(cambios);
   } else {
     await db.collection('movimientos').add({
-      fechaISO, fechaDisplay, pac: selPaciente.value, prof: selProfesional.value,
+      fechaISO, fechaDisplay, pac: pacValor, prof: selProfesional.value,
       concepto: selConcepto.value, codigo, notas: document.getElementById('inpNotas').value,
       moneda: monedaSel, valor: valorNum, pagos, tieneDeudaPendiente: pendienteDeuda,
       creadoPor: currentUser.nombre, creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
@@ -1403,17 +1532,38 @@ function renderDeudores(){
 /* =====================================================================
    REPORTE DIARIO (PDF horizontal)
    ===================================================================== */
+const overlayReporteFecha = document.getElementById('overlayReporteFecha');
 document.getElementById('btnReporteDiario').onclick = ()=>{
-  const hoy = hoyISO();
-  const filas = movimientosHoy;
-  if(!filas.length){ alert("Todavía no hay movimientos cargados hoy."); return; }
+  document.getElementById('inpFechaReporte').value = hoyISO();
+  overlayReporteFecha.classList.add('show');
+};
+document.getElementById('closeReporteFecha').onclick = ()=> overlayReporteFecha.classList.remove('show');
+document.getElementById('cancelReporteFecha').onclick = ()=> overlayReporteFecha.classList.remove('show');
+document.getElementById('generarReporteFecha').onclick = async ()=>{
+  const fechaISO = document.getElementById('inpFechaReporte').value;
+  if(!fechaISO){ alert("Elegí una fecha."); return; }
+  const btn = document.getElementById('generarReporteFecha');
+  btn.disabled = true; btn.textContent = "Generando…";
+  try{
+    const snap = await db.collection('movimientos').where('fechaISO','==', fechaISO).get();
+    const filas = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    if(!filas.length){ alert("No hay movimientos cargados en esa fecha."); return; }
+    generarPDFReporteDiario(filas, fechaISO);
+    overlayReporteFecha.classList.remove('show');
+  }catch(e){
+    alert("Error al generar el reporte: " + e.message);
+  }
+  btn.disabled = false; btn.textContent = "Generar PDF";
+};
 
+function generarPDFReporteDiario(filas, fechaISO){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({orientation:'landscape', unit:'pt', format:'a4'});
   doc.setFont('helvetica','bold'); doc.setFontSize(14);
   doc.text(`CAJA UMMANA — Reporte diario`, 40, 40);
   doc.setFont('helvetica','normal'); doc.setFontSize(10);
-  doc.text(document.getElementById('fechaHoy').textContent, 40, 58);
+  const [y_, m_, d_] = fechaISO.split('-');
+  doc.text(`${d_}/${m_}/${y_}`, 40, 58);
 
   const body = filas.map(m=>[m.fechaDisplay, m.pac, m.prof, m.concepto, m.notas||"", fmtTotal(m), medioDisplayText(m)]);
   doc.autoTable({
@@ -1426,7 +1576,7 @@ document.getElementById('btnReporteDiario').onclick = ()=>{
 
   let totalPesosIn=0, totalUsdIn=0, totalPesosOut=0, totalUsdOut=0;
   filas.forEach(m=>{
-    const esGasto = m.prof === "GASTOS";
+    const esGasto = esEgreso(m.prof);
     if(m.moneda==="USD"){ esGasto ? totalUsdOut+=m.valor : totalUsdIn+=m.valor; }
     else { esGasto ? totalPesosOut+=m.valor : totalPesosIn+=m.valor; }
   });
@@ -1436,8 +1586,8 @@ document.getElementById('btnReporteDiario').onclick = ()=>{
   doc.text(`Egresos:   $ ${totalPesosOut.toLocaleString('es-AR')}   ·   US$ ${totalUsdOut.toLocaleString('es-AR')}`, 40, y); y+=18;
   doc.setFont('helvetica','bold');
   doc.text(`Saldo neto: $ ${(totalPesosIn-totalPesosOut).toLocaleString('es-AR')}   ·   US$ ${(totalUsdIn-totalUsdOut).toLocaleString('es-AR')}`, 40, y);
-  doc.save(`reporte-diario-${hoy}.pdf`);
-};
+  doc.save(`reporte-diario-${fechaISO}.pdf`);
+}
 
 /* =====================================================================
    CALCULAR PAGO A PROFESIONAL
@@ -1445,7 +1595,7 @@ document.getElementById('btnReporteDiario').onclick = ()=>{
 const overlayPago = document.getElementById('overlayPago');
 const selProfesionalPago = document.getElementById('selProfesionalPago');
 let pagoMovsActuales = [];
-attachAutocomplete(selProfesionalPago, ()=> Object.keys(CONCEPTOS).filter(p=>p!=="GASTOS"));
+attachAutocomplete(selProfesionalPago, ()=> Object.keys(CONCEPTOS).filter(p=>!esEgreso(p)));
 
 document.getElementById('btnPagoProfesional').onclick = ()=>{
   selProfesionalPago.value = "";
@@ -1524,7 +1674,7 @@ function renderInformes(){
   const filas = movimientosHoy;
   let ingresos=0, egresos=0, deudaPendiente=0;
   filas.forEach(m=>{
-    if(m.prof==="GASTOS") egresos += (m.moneda==="$"?m.valor:0);
+    if(esEgreso(m.prof)) egresos += (m.moneda==="$"?m.valor:0);
     else ingresos += (m.moneda==="$"?m.valor:0);
   });
   movimientosDeuda.filter(m=>m.moneda==="$").forEach(m=> deudaPendiente += m.valor);
@@ -1811,7 +1961,7 @@ const buscarPacienteInput = document.getElementById('buscarPacienteInput');
 
 document.getElementById('btnPacientes').onclick = ()=>{
   buscarPacienteInput.value = "";
-  document.getElementById('pacientesScroll').innerHTML = '<div class="empty-state">Escribí un apellido o nombre para buscar.</div>';
+  renderPacientesBusqueda();
   overlayPacientes.classList.add('show');
   buscarPacienteInput.focus();
 };
@@ -1822,49 +1972,187 @@ buscarPacienteInput.addEventListener('input', renderPacientesBusqueda);
 function renderPacientesBusqueda(){
   const q = buscarPacienteInput.value.trim().toLowerCase();
   const cont = document.getElementById('pacientesScroll');
-  if(!q){ cont.innerHTML = '<div class="empty-state">Escribí un apellido o nombre para buscar.</div>'; return; }
-  const encontrados = pacientesFullList.filter(p=>
-    (p.apellido||"").toLowerCase().includes(q) || (p.nombre||"").toLowerCase().includes(q)
-  ).slice(0,60);
-  if(!encontrados.length){ cont.innerHTML = '<div class="empty-state">No encontré pacientes con ese nombre.</div>'; return; }
-  cont.innerHTML = encontrados.map(p=>`
-    <div class="paciente-card" data-id="${p.id}">
-      <div class="field"><label>Apellido</label><input type="text" class="pc-apellido" value="${p.apellido||""}"></div>
-      <div class="field"><label>Nombre</label><input type="text" class="pc-nombre" value="${p.nombre||""}"></div>
-      <div class="field"><label>Teléfono</label><input type="tel" class="pc-telefono" value="${p.telefono||""}"></div>
-      <div class="field"><label>Email</label><input type="email" class="pc-email" value="${p.email||""}"></div>
-      <div class="field"><label>Fecha nac.</label><input type="text" class="pc-fnac" value="${p.fnac||""}"></div>
-      <div class="field"><label>DNI</label><input type="text" class="pc-dni" value="${p.dni||""}"></div>
-      <div class="field"><label>Medio de llegada</label><input type="text" class="pc-medio" value="${p.medioLlegada||""}"></div>
-      <button class="btn btn-primary" style="width:100%;" onclick="guardarPacienteCard('${p.id}', this)">Guardar cambios</button>
+  const filtrados = q
+    ? pacientesFullList.filter(p=> (p.apellido||"").toLowerCase().includes(q) || (p.nombre||"").toLowerCase().includes(q))
+    : pacientesFullList;
+  if(!filtrados.length){ cont.innerHTML = '<div class="empty-state">No encontré pacientes con ese nombre.</div>'; return; }
+  cont.innerHTML = filtrados.map(p=>`
+    <div class="fila-editable" data-id="${p.id}">
+      <input type="text" class="col pc-apellido" value="${p.apellido||""}" placeholder="Apellido">
+      <input type="text" class="col pc-nombre" value="${p.nombre||""}" placeholder="Nombre">
+      <input type="tel" class="col col-chico pc-telefono" value="${p.telefono||""}" placeholder="Teléfono">
+      <input type="email" class="col pc-email" value="${p.email||""}" placeholder="Email">
+      <input type="text" class="col col-chico pc-fnac" value="${p.fnac||""}" placeholder="F. nac.">
+      <input type="text" class="col col-chico pc-dni" value="${p.dni||""}" placeholder="DNI">
+      <input type="text" class="col pc-medio" value="${p.medioLlegada||""}" placeholder="Medio de llegada">
+      <button class="btn-guardar-fila" onclick="guardarPacienteCard('${p.id}', this)">Guardar</button>
     </div>
   `).join('');
 }
 
 async function guardarPacienteCard(id, btn){
-  const card = btn.closest('.paciente-card');
-  const apellido = card.querySelector('.pc-apellido').value.trim().toUpperCase();
-  const nombre = card.querySelector('.pc-nombre').value.trim();
+  const fila = btn.closest('.fila-editable');
+  const apellido = fila.querySelector('.pc-apellido').value.trim().toUpperCase();
+  const nombre = fila.querySelector('.pc-nombre').value.trim();
   if(!apellido || !nombre){ alert("Apellido y nombre son obligatorios."); return; }
   const datos = {
     apellido, nombre, nombreCompleto: `${apellido}, ${nombre}`,
-    telefono: card.querySelector('.pc-telefono').value.trim(),
-    email: card.querySelector('.pc-email').value.trim(),
-    fnac: card.querySelector('.pc-fnac').value.trim(),
-    dni: card.querySelector('.pc-dni').value.trim(),
-    medioLlegada: card.querySelector('.pc-medio').value.trim(),
+    telefono: fila.querySelector('.pc-telefono').value.trim(),
+    email: fila.querySelector('.pc-email').value.trim(),
+    fnac: fila.querySelector('.pc-fnac').value.trim(),
+    dni: fila.querySelector('.pc-dni').value.trim(),
+    medioLlegada: fila.querySelector('.pc-medio').value.trim(),
   };
+  const txtOriginal = btn.textContent;
   btn.disabled = true; btn.textContent = "Guardando…";
   try{
     await db.collection('pacientes').doc(id).update(datos);
     btn.textContent = "¡Guardado!";
-    setTimeout(()=>{ btn.textContent = "Guardar cambios"; btn.disabled = false; }, 1200);
+    setTimeout(()=>{ btn.textContent = txtOriginal; btn.disabled = false; }, 1200);
   }catch(e){
     alert("No se pudo guardar: " + e.message);
-    btn.disabled = false; btn.textContent = "Guardar cambios";
+    btn.disabled = false; btn.textContent = txtOriginal;
   }
 }
 window.guardarPacienteCard = guardarPacienteCard;
+
+/* =====================================================================
+   PANEL "PROFESIONALES / ÁREA" (admin) — ingreso/egreso
+   ===================================================================== */
+const overlayProfesionalesPanel = document.getElementById('overlayProfesionalesPanel');
+const buscarProfesionalInput = document.getElementById('buscarProfesionalInput');
+
+document.getElementById('btnProfesionalesPanel').onclick = ()=>{
+  buscarProfesionalInput.value = "";
+  renderProfesionalesBusqueda();
+  overlayProfesionalesPanel.classList.add('show');
+};
+document.getElementById('closeProfesionalesPanel').onclick = ()=> overlayProfesionalesPanel.classList.remove('show');
+document.getElementById('cerrarProfesionalesPanel').onclick = ()=> overlayProfesionalesPanel.classList.remove('show');
+buscarProfesionalInput.addEventListener('input', renderProfesionalesBusqueda);
+
+// Combina lo que ya está guardado en la colección "profesionales" con cualquier
+// nombre que exista en el catálogo de conceptos pero todavía no tenga tipo asignado
+// (por ejemplo, recién importado desde el CSV de conceptos).
+function listaProfesionalesCombinada(){
+  const porNombre = {};
+  profesionalesFullList.forEach(p=> porNombre[p.nombre] = {id:p.id, nombre:p.nombre, tipo:p.tipo||"ingreso"});
+  Object.keys(CONCEPTOS).forEach(nombre=>{
+    if(!porNombre[nombre]) porNombre[nombre] = {id:null, nombre, tipo:"ingreso"};
+  });
+  return Object.values(porNombre).sort((a,b)=> a.nombre.localeCompare(b.nombre,'es'));
+}
+
+function renderProfesionalesBusqueda(){
+  const q = buscarProfesionalInput.value.trim().toLowerCase();
+  const cont = document.getElementById('profesionalesScroll');
+  const lista = listaProfesionalesCombinada().filter(p=> !q || p.nombre.toLowerCase().includes(q));
+  if(!lista.length){ cont.innerHTML = '<div class="empty-state">No encontré profesionales/área con ese nombre.</div>'; return; }
+  cont.innerHTML = lista.map(p=>`
+    <div class="fila-editable" data-nombre="${p.nombre}" data-id="${p.id||''}">
+      <input type="text" class="col pf-nombre" value="${p.nombre}" placeholder="Nombre">
+      <select class="col-chico pf-tipo">
+        <option value="ingreso" ${p.tipo==='ingreso'?'selected':''}>Ingreso</option>
+        <option value="egreso" ${p.tipo==='egreso'?'selected':''}>Egreso</option>
+      </select>
+      <button class="btn-guardar-fila" onclick="guardarProfesionalFila(this)">Guardar</button>
+    </div>
+  `).join('');
+}
+
+async function guardarProfesionalFila(btn){
+  const fila = btn.closest('.fila-editable');
+  const id = fila.dataset.id;
+  const nombreOriginal = fila.dataset.nombre;
+  const nombre = fila.querySelector('.pf-nombre').value.trim();
+  const tipo = fila.querySelector('.pf-tipo').value;
+  if(!nombre){ alert("El nombre no puede quedar vacío."); return; }
+  const txtOriginal = btn.textContent;
+  btn.disabled = true; btn.textContent = "Guardando…";
+  try{
+    if(id){
+      await db.collection('profesionales').doc(id).update({nombre, tipo});
+    } else {
+      await db.collection('profesionales').add({nombre, tipo});
+    }
+    btn.textContent = "¡Guardado!";
+    setTimeout(()=>{ btn.textContent = txtOriginal; btn.disabled = false; }, 1200);
+  }catch(e){
+    alert("No se pudo guardar: " + e.message);
+    btn.disabled = false; btn.textContent = txtOriginal;
+  }
+}
+window.guardarProfesionalFila = guardarProfesionalFila;
+
+/* =====================================================================
+   PANEL "CONCEPTOS" (admin) — reasignar profesional/área y código
+   ===================================================================== */
+const overlayConceptos = document.getElementById('overlayConceptos');
+const buscarConceptoInput = document.getElementById('buscarConceptoInput');
+
+document.getElementById('btnConceptosPanel').onclick = ()=>{
+  buscarConceptoInput.value = "";
+  renderConceptosBusqueda();
+  overlayConceptosPanel_show();
+};
+function overlayConceptosPanel_show(){ overlayConceptos.classList.add('show'); }
+document.getElementById('closeConceptos').onclick = ()=> overlayConceptos.classList.remove('show');
+document.getElementById('cerrarConceptos').onclick = ()=> overlayConceptos.classList.remove('show');
+buscarConceptoInput.addEventListener('input', renderConceptosBusqueda);
+
+function todosLosConceptos(){
+  const lista = [];
+  Object.keys(CONCEPTOS).forEach(prof=>{
+    CONCEPTOS[prof].forEach(c=> lista.push({profesional: prof, concepto: c.concepto, codigo: c.codigo}));
+  });
+  return lista.sort((a,b)=> a.profesional.localeCompare(b.profesional,'es') || (a.codigo||"").localeCompare(b.codigo||"",'es',{numeric:true}));
+}
+
+function renderConceptosBusqueda(){
+  const q = buscarConceptoInput.value.trim().toLowerCase();
+  const cont = document.getElementById('conceptosScroll');
+  const opcionesProf = Object.keys(CONCEPTOS).sort();
+  const lista = todosLosConceptos().filter(c=> !q ||
+    c.profesional.toLowerCase().includes(q) || c.concepto.toLowerCase().includes(q) || (c.codigo||"").toLowerCase().includes(q)
+  );
+  if(!lista.length){ cont.innerHTML = '<div class="empty-state">No encontré conceptos con esa búsqueda.</div>'; return; }
+  cont.innerHTML = lista.map(c=>`
+    <div class="fila-editable" data-profesional-original="${c.profesional}" data-concepto-original="${c.concepto}">
+      <select class="col-chico cc-profesional">
+        ${opcionesProf.map(p=>`<option value="${p}" ${p===c.profesional?'selected':''}>${p}</option>`).join('')}
+      </select>
+      <input type="text" class="col cc-concepto" value="${c.concepto}" placeholder="Concepto">
+      <input type="text" class="col-chico cc-codigo" value="${c.codigo||""}" placeholder="Código">
+      <button class="btn-guardar-fila" onclick="guardarConceptoFila(this)">Guardar</button>
+    </div>
+  `).join('');
+}
+
+async function guardarConceptoFila(btn){
+  const fila = btn.closest('.fila-editable');
+  const profOriginal = fila.dataset.profesionalOriginal;
+  const conceptoOriginal = fila.dataset.conceptoOriginal;
+  const profesional = fila.querySelector('.cc-profesional').value;
+  const concepto = fila.querySelector('.cc-concepto').value.trim();
+  const codigo = fila.querySelector('.cc-codigo').value.trim();
+  if(!concepto){ alert("El concepto no puede quedar vacío."); return; }
+  const txtOriginal = btn.textContent;
+  btn.disabled = true; btn.textContent = "Guardando…";
+  try{
+    const snap = await db.collection('conceptos')
+      .where('profesional','==', profOriginal)
+      .where('concepto','==', conceptoOriginal)
+      .limit(1).get();
+    if(snap.empty){ throw new Error("No encontré el concepto original en la base."); }
+    await snap.docs[0].ref.update({profesional, concepto, codigo});
+    btn.textContent = "¡Guardado!";
+    setTimeout(()=>{ btn.textContent = txtOriginal; btn.disabled = false; }, 1200);
+  }catch(e){
+    alert("No se pudo guardar: " + e.message);
+    btn.disabled = false; btn.textContent = txtOriginal;
+  }
+}
+window.guardarConceptoFila = guardarConceptoFila;
 </script>
 </body>
 </html>
