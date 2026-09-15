@@ -335,6 +335,7 @@
       <button class="btn" id="btnPacientes">🧑 Pacientes</button>
       <button class="btn col-hidden" id="btnProfesionalesPanel">🩺 Profesionales/Áreas</button>
       <button class="btn col-hidden" id="btnConceptosPanel">📋 Conceptos</button>
+      <button class="btn col-hidden" id="btnProveedoresPanel">🏷 Proveedores</button>
       <button class="btn btn-deudores" id="btnDeudores">💰 Deudores <span class="badge-count col-hidden" id="deudoresCount">0</span></button>
       <button class="btn col-hidden" id="btnInformes">📊 Informes</button>
       <button class="btn" id="btnReporteDiario">🧾 Reporte diario</button>
@@ -448,7 +449,21 @@
 
     <div class="field col-hidden" id="campoPacienteEgreso">
       <label>Destinatario / Proveedor <span class="opt">(a quién se le paga)</span></label>
-      <input type="text" id="inpDestinatario" placeholder="Ej: Inmobiliaria Pérez, Sueldo Mariana…">
+      <div class="combo">
+        <div class="ac-wrap">
+          <input type="text" id="inpDestinatario" placeholder="Escribí para buscar…" autocomplete="off">
+        </div>
+        <button class="addbtn" id="btnAddProveedor" title="Agregar nuevo destinatario/proveedor">+</button>
+      </div>
+    </div>
+
+    <div class="subcard col-hidden" id="cardNuevoProveedor">
+      <h3>Nuevo destinatario / proveedor</h3>
+      <div class="field"><label>Nombre *</label><input type="text" id="npProveedorNombre" placeholder="Ej: Librería, Agua Ivess…"></div>
+      <div class="modal-actions">
+        <button class="btn" id="cancelProveedor">Cancelar</button>
+        <button class="btn btn-primary" id="guardarProveedor">Guardar</button>
+      </div>
     </div>
 
     <div class="field col-hidden" id="deudasPacienteBox">
@@ -567,11 +582,17 @@
   <div class="modal wide">
     <button class="close-x" id="closePago">✕</button>
     <h2>Calcular pago a profesional</h2>
-    <div class="modal-sub">Movimientos de hoy, <span id="fechaModalPago"></span></div>
-    <div class="field">
-      <label>Profesional</label>
-      <div class="ac-wrap">
-        <input type="text" id="selProfesionalPago" placeholder="Escribí para buscar…" autocomplete="off">
+    <div class="modal-sub">Elegí la fecha y el profesional para calcular lo que se le paga.</div>
+    <div class="row2">
+      <div class="field">
+        <label>Fecha</label>
+        <input type="date" id="inpFechaPago">
+      </div>
+      <div class="field">
+        <label>Profesional</label>
+        <div class="ac-wrap">
+          <input type="text" id="selProfesionalPago" placeholder="Escribí para buscar…" autocomplete="off">
+        </div>
       </div>
     </div>
     <div id="pagoPreview"></div>
@@ -659,6 +680,29 @@
         <input type="file" id="inpImportarConceptos" accept=".xlsx,.xls" style="display:none;">
       </label>
       <button class="btn" id="cerrarConceptos" style="margin-left:auto;">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: PROVEEDORES / DESTINATARIOS (buscar y editar) ============ -->
+<div class="overlay" id="overlayProveedores">
+  <div class="modal" style="max-width:700px;">
+    <button class="close-x" id="closeProveedores">✕</button>
+    <h2>Proveedores / Destinatarios</h2>
+    <div class="modal-sub">Orden alfabético — a quién se le pagan los gastos (librería, alquiler, sueldos, etc).</div>
+    <div class="lista-toolbar">
+      <input type="text" id="buscarProveedorInput" placeholder="Buscar…" autocomplete="off">
+      <button class="addbtn" id="btnNuevoProveedor" title="Agregar proveedor/destinatario">+</button>
+    </div>
+    <div class="lista-rows" id="proveedoresScroll"></div>
+    <div class="modal-sub" id="importarProveedoresInfo" style="margin:10px 0 0;"></div>
+    <div class="modal-actions">
+      <button class="btn" id="btnExportarProveedores">Exportar Excel</button>
+      <label class="btn" style="cursor:pointer;margin:0;">
+        Importar Excel
+        <input type="file" id="inpImportarProveedores" accept=".xlsx,.xls" style="display:none;">
+      </label>
+      <button class="btn" id="cerrarProveedores" style="margin-left:auto;">Cerrar</button>
     </div>
   </div>
 </div>
@@ -879,8 +923,10 @@ document.getElementById('sidebarToggle').onclick = ()=>{
   document.getElementById('sidebarNav').classList.toggle('collapsed');
 };
 
-let unsubMovimientos = null, unsubPacientes = null, unsubCajaAbierta = null, unsubHoy = null, unsubDeuda = null, unsubConceptos = null, unsubProfesionales = null;
+let unsubMovimientos = null, unsubPacientes = null, unsubCajaAbierta = null, unsubHoy = null, unsubDeuda = null, unsubConceptos = null, unsubProfesionales = null, unsubProveedores = null;
 let profesionalesFullList = [];
+let proveedoresFullList = [];
+let proveedoresRegistry = [];
 
 auth.onAuthStateChanged(async (user)=>{
   if(!user){
@@ -893,6 +939,7 @@ auth.onAuthStateChanged(async (user)=>{
     if(unsubDeuda) unsubDeuda();
     if(unsubConceptos) unsubConceptos();
     if(unsubProfesionales) unsubProfesionales();
+    if(unsubProveedores) unsubProveedores();
     return;
   }
   const doc = await db.collection('usuarios').doc(user.uid).get();
@@ -947,6 +994,7 @@ function aplicarRolUI(){
   document.getElementById('btnCajas').classList.toggle('col-hidden', !esAdmin);
   document.getElementById('btnProfesionalesPanel').classList.toggle('col-hidden', !esAdmin);
   document.getElementById('btnConceptosPanel').classList.toggle('col-hidden', !esAdmin);
+  document.getElementById('btnProveedoresPanel').classList.toggle('col-hidden', !esAdmin);
 }
 
 /* =====================================================================
@@ -993,7 +1041,14 @@ function iniciarListeners(){
     profesionalesFullList.forEach(p=> PROFESIONALES_TIPO[p.nombre] = p.tipo);
     actualizarCampoPacienteSegunTipo();
     renderTabla();
-    if(overlayProfesionales.classList.contains('show')) renderProfesionalesBusqueda();
+    if(overlayProfesionalesPanel.classList.contains('show')) renderProfesionalesBusqueda();
+  });
+
+  // Proveedores/destinatarios de gastos
+  unsubProveedores = db.collection('proveedores').orderBy('nombre').onSnapshot(snap=>{
+    proveedoresFullList = snap.docs.map(d=> ({id:d.id, ...d.data()}));
+    proveedoresRegistry = proveedoresFullList.map(p=> p.nombre);
+    if(overlayProveedores.classList.contains('show')) renderProveedoresBusqueda();
   });
 
   // Movimientos del mes elegido (por defecto, el mes en curso)
@@ -1360,6 +1415,22 @@ function poblarProfesionalesUI(){
   actualizarConceptosDesdeProfesional();
 }
 attachAutocomplete(selPaciente, ()=> pacienteRegistry);
+attachAutocomplete(document.getElementById('inpDestinatario'), ()=> proveedoresRegistry);
+
+document.getElementById('btnAddProveedor').onclick = ()=> document.getElementById('cardNuevoProveedor').classList.remove('col-hidden');
+document.getElementById('cancelProveedor').onclick = ()=> document.getElementById('cardNuevoProveedor').classList.add('col-hidden');
+document.getElementById('guardarProveedor').onclick = async ()=>{
+  const nombre = document.getElementById('npProveedorNombre').value.trim();
+  if(!nombre){ alert("Ingresá un nombre."); return; }
+  try{
+    await db.collection('proveedores').add({nombre});
+    document.getElementById('inpDestinatario').value = nombre;
+    document.getElementById('cardNuevoProveedor').classList.add('col-hidden');
+    document.getElementById('npProveedorNombre').value = "";
+  }catch(e){
+    alert("No se pudo guardar: " + e.message);
+  }
+};
 attachAutocomplete(selProfesional, ()=> Object.keys(CONCEPTOS).sort());
 selProfesional.addEventListener('input', actualizarConceptosDesdeProfesional);
 
@@ -1407,6 +1478,7 @@ function resetModal(){
   document.getElementById('inpDestinatario').value = "";
   document.getElementById('campoPacienteIngreso').classList.remove('col-hidden');
   document.getElementById('campoPacienteEgreso').classList.add('col-hidden');
+  document.getElementById('cardNuevoProveedor').classList.add('col-hidden');
   selProfesional.value = "";
   selConcepto.innerHTML = '<option value="">Elegí primero un profesional/área…</option>';
   selConcepto.disabled = true;
@@ -1673,27 +1745,38 @@ function generarPDFReporteDiario(filas, fechaISO){
    ===================================================================== */
 const overlayPago = document.getElementById('overlayPago');
 const selProfesionalPago = document.getElementById('selProfesionalPago');
+const inpFechaPago = document.getElementById('inpFechaPago');
 let pagoMovsActuales = [];
 attachAutocomplete(selProfesionalPago, ()=> Object.keys(CONCEPTOS).filter(p=>!esEgreso(p)));
 
 document.getElementById('btnPagoProfesional').onclick = ()=>{
   selProfesionalPago.value = "";
+  inpFechaPago.value = hoyISO();
   document.getElementById('pagoPreview').innerHTML = "";
   document.getElementById('btnExportarPago').disabled = true;
-  document.getElementById('fechaModalPago').textContent = new Date().toLocaleDateString('es-AR');
   overlayPago.classList.add('show');
 };
 document.getElementById('closePago').onclick = ()=> overlayPago.classList.remove('show');
 document.getElementById('cancelPago').onclick = ()=> overlayPago.classList.remove('show');
 
-function refreshPagoPreview(){
+async function refreshPagoPreview(){
   const prof = selProfesionalPago.value;
+  const fechaISO = inpFechaPago.value;
   const preview = document.getElementById('pagoPreview');
   const btnExp = document.getElementById('btnExportarPago');
-  const hoy = hoyISO();
-  pagoMovsActuales = movimientosHoy.filter(m=>m.prof===prof);
-  if(!prof || !pagoMovsActuales.length){
-    preview.innerHTML = prof ? '<div class="empty-state">Sin movimientos hoy para este profesional.</div>' : "";
+  if(!prof || !fechaISO){ preview.innerHTML = ""; btnExp.disabled = true; return; }
+
+  preview.innerHTML = '<div class="empty-state">Buscando…</div>';
+  try{
+    const snap = await db.collection('movimientos').where('fechaISO','==', fechaISO).where('prof','==', prof).get();
+    pagoMovsActuales = snap.docs.map(d=> d.data());
+  }catch(e){
+    preview.innerHTML = `<div class="empty-state">Error al buscar: ${e.message}</div>`;
+    btnExp.disabled = true; return;
+  }
+
+  if(!pagoMovsActuales.length){
+    preview.innerHTML = '<div class="empty-state">Sin movimientos de este profesional en esa fecha.</div>';
     btnExp.disabled = true; return;
   }
   let totalPesos=0, totalUsd=0;
@@ -1713,16 +1796,19 @@ function refreshPagoPreview(){
   btnExp.disabled = false;
 }
 selProfesionalPago.addEventListener('input', refreshPagoPreview);
+inpFechaPago.addEventListener('input', refreshPagoPreview);
 
 document.getElementById('btnExportarPago').onclick = ()=>{
   const prof = selProfesionalPago.value;
+  const fechaISO = inpFechaPago.value;
   if(!pagoMovsActuales.length) return;
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({orientation:'landscape', unit:'pt', format:'a4'});
   doc.setFont('helvetica','bold'); doc.setFontSize(14);
   doc.text(`CAJA UMMANA — Pago a profesional: ${prof}`, 40, 40);
   doc.setFont('helvetica','normal'); doc.setFontSize(10);
-  doc.text(new Date().toLocaleDateString('es-AR'), 40, 58);
+  const [y_,m_,d_] = fechaISO.split('-');
+  doc.text(`${d_}/${m_}/${y_}`, 40, 58);
 
   const body = pagoMovsActuales.map(m=>[m.pac, m.concepto, m.notas||"", fmtTotal(m), medioDisplayText(m)]);
   doc.autoTable({
@@ -1737,7 +1823,7 @@ document.getElementById('btnExportarPago').onclick = ()=>{
   doc.setFont('helvetica','bold'); doc.setFontSize(12);
   if(totalPesos>0){ doc.text(`Total a pagar: $ ${totalPesos.toLocaleString('es-AR')}`, 40, y); y+=18; }
   if(totalUsd>0){ doc.text(`Total a pagar: US$ ${totalUsd.toLocaleString('es-AR')}`, 40, y); }
-  doc.save(`pago-${prof.replace(/[^a-z0-9]+/gi,'-')}-${hoyISO()}.pdf`);
+  doc.save(`pago-${prof.replace(/[^a-z0-9]+/gi,'-')}-${fechaISO}.pdf`);
 };
 
 /* =====================================================================
@@ -2171,6 +2257,123 @@ async function eliminarPacienteFila(id, btn){
   }
 }
 window.eliminarPacienteFila = eliminarPacienteFila;
+
+/* =====================================================================
+   PANEL "PROVEEDORES / DESTINATARIOS" (admin)
+   ===================================================================== */
+const overlayProveedores = document.getElementById('overlayProveedores');
+const buscarProveedorInput = document.getElementById('buscarProveedorInput');
+let mostrarNuevoProveedorPanel = false;
+
+document.getElementById('btnProveedoresPanel').onclick = ()=>{
+  buscarProveedorInput.value = "";
+  mostrarNuevoProveedorPanel = false;
+  renderProveedoresBusqueda();
+  overlayProveedores.classList.add('show');
+};
+document.getElementById('closeProveedores').onclick = ()=> overlayProveedores.classList.remove('show');
+document.getElementById('cerrarProveedores').onclick = ()=> overlayProveedores.classList.remove('show');
+document.getElementById('btnNuevoProveedor').onclick = ()=>{
+  mostrarNuevoProveedorPanel = !mostrarNuevoProveedorPanel;
+  renderProveedoresBusqueda();
+};
+buscarProveedorInput.addEventListener('input', renderProveedoresBusqueda);
+
+function filaProveedorHTML(p, esNueva){
+  return `
+    <div class="fila-editable" data-id="${p.id||''}">
+      <input type="text" class="col pv-nombre" value="${p.nombre||''}" placeholder="Ej: Librería, Agua Ivess…">
+      <button class="btn-guardar-fila" onclick="${esNueva ? 'crearProveedorFila(this)' : `guardarProveedorFila('${p.id}', this)`}">${esNueva ? "Crear" : "Guardar"}</button>
+      ${esNueva ? "" : `<button class="btn-eliminar-fila" onclick="eliminarProveedorFila('${p.id}', this)" title="Eliminar">✕</button>`}
+    </div>
+  `;
+}
+
+function renderProveedoresBusqueda(){
+  const q = buscarProveedorInput.value.trim().toLowerCase();
+  const cont = document.getElementById('proveedoresScroll');
+  const filtrados = q ? proveedoresFullList.filter(p=> (p.nombre||"").toLowerCase().includes(q)) : proveedoresFullList;
+  const nuevaFila = mostrarNuevoProveedorPanel ? filaProveedorHTML({}, true) : "";
+  if(!filtrados.length && !nuevaFila){ cont.innerHTML = '<div class="empty-state">No encontré proveedores con ese nombre.</div>'; return; }
+  cont.innerHTML = nuevaFila + filtrados.map(p=> filaProveedorHTML(p, false)).join('');
+}
+
+async function crearProveedorFila(btn){
+  const fila = btn.closest('.fila-editable');
+  const nombre = fila.querySelector('.pv-nombre').value.trim();
+  if(!nombre){ alert("El nombre no puede quedar vacío."); return; }
+  btn.disabled = true; btn.textContent = "Creando…";
+  try{
+    await db.collection('proveedores').add({nombre});
+    mostrarNuevoProveedorPanel = false;
+  }catch(e){
+    alert("No se pudo crear: " + e.message);
+    btn.disabled = false; btn.textContent = "Crear";
+  }
+}
+window.crearProveedorFila = crearProveedorFila;
+
+async function guardarProveedorFila(id, btn){
+  const fila = btn.closest('.fila-editable');
+  const nombre = fila.querySelector('.pv-nombre').value.trim();
+  if(!nombre){ alert("El nombre no puede quedar vacío."); return; }
+  const txtOriginal = btn.textContent;
+  btn.disabled = true; btn.textContent = "Guardando…";
+  try{
+    await db.collection('proveedores').doc(id).update({nombre});
+    btn.textContent = "¡Guardado!";
+    setTimeout(()=>{ btn.textContent = txtOriginal; btn.disabled = false; }, 1200);
+  }catch(e){
+    alert("No se pudo guardar: " + e.message);
+    btn.disabled = false; btn.textContent = txtOriginal;
+  }
+}
+window.guardarProveedorFila = guardarProveedorFila;
+
+async function eliminarProveedorFila(id, btn){
+  if(!confirm("¿Eliminar este proveedor/destinatario? Esta acción no se puede deshacer.")) return;
+  btn.disabled = true;
+  try{
+    await db.collection('proveedores').doc(id).delete();
+  }catch(e){
+    alert("No se pudo eliminar: " + e.message);
+    btn.disabled = false;
+  }
+}
+window.eliminarProveedorFila = eliminarProveedorFila;
+
+document.getElementById('btnExportarProveedores').onclick = ()=>{
+  const filas = proveedoresFullList.map(p=> ({"Proveedor/Destinatario": p.nombre}));
+  const ws = XLSX.utils.json_to_sheet(filas);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Proveedores");
+  XLSX.writeFile(wb, "proveedores.xlsx");
+};
+
+document.getElementById('inpImportarProveedores').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const info = document.getElementById('importarProveedoresInfo');
+  info.textContent = "Leyendo archivo…";
+  try{
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data);
+    const filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+    const existentes = new Set(proveedoresFullList.map(p=>p.nombre));
+    let creados = 0, ignorados = 0;
+    for(const fila of filas){
+      const nombre = (fila["Proveedor/Destinatario"] || fila["Proveedor"] || fila["Nombre"] || "").toString().trim();
+      if(!nombre || existentes.has(nombre)){ ignorados++; continue; }
+      await db.collection('proveedores').add({nombre});
+      existentes.add(nombre);
+      creados++;
+    }
+    info.textContent = `Listo: ${creados} nuevos` + (ignorados ? ` (se ignoraron ${ignorados} filas vacías o repetidas)` : "") + ".";
+  }catch(err){
+    info.textContent = "Error al importar: " + err.message;
+  }
+  e.target.value = "";
+});
 
 /* =====================================================================
    PANEL "PROFESIONALES / ÁREA" (admin) — ingreso/egreso
