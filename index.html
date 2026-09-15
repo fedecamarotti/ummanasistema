@@ -91,6 +91,7 @@
   }
   .sidebar-links button:hover{background:#f4f4f6;}
   .sidebar-links .btn-deudores{background:transparent;position:relative;}
+  .side-icon{display:inline-block;width:18px;text-align:center;}
   .main-area{flex:1;min-width:0;}
   .btn{
     border:1px solid var(--border);background:#fff;padding:8px 16px;border-radius:7px;
@@ -331,16 +332,16 @@
   <div class="sidebar" id="sidebarNav">
     <button class="sidebar-toggle" id="sidebarToggle" title="Contraer/expandir">☰</button>
     <div class="sidebar-links" id="sidebarLinks">
-      <button class="btn col-hidden" id="btnCajas">🗄 Cajas</button>
-      <button class="btn" id="btnPacientes">🧑 Pacientes</button>
-      <button class="btn col-hidden" id="btnProfesionalesPanel">🩺 Profesionales/Áreas</button>
-      <button class="btn col-hidden" id="btnConceptosPanel">📋 Conceptos</button>
-      <button class="btn col-hidden" id="btnProveedoresPanel">🏷 Proveedores</button>
-      <button class="btn btn-deudores" id="btnDeudores">💰 Deudores <span class="badge-count col-hidden" id="deudoresCount">0</span></button>
-      <button class="btn col-hidden" id="btnInformes">📊 Informes</button>
-      <button class="btn" id="btnReporteDiario">🧾 Reporte diario</button>
-      <button class="btn" id="btnPagoProfesional">💵 Calcular pago profesional</button>
-      <button class="btn col-hidden" id="btnImportar">⬆ Importar catálogo</button>
+      <button class="btn col-hidden" id="btnCajas"><span class="side-icon">🗄</span> Cajas</button>
+      <button class="btn" id="btnPacientes"><span class="side-icon">🧑</span> Pacientes</button>
+      <button class="btn col-hidden" id="btnProfesionalesPanel"><span class="side-icon">🩺</span> Profesionales/Áreas</button>
+      <button class="btn col-hidden" id="btnConceptosPanel"><span class="side-icon">📋</span> Conceptos</button>
+      <button class="btn col-hidden" id="btnProveedoresPanel"><span class="side-icon">🏷</span> Proveedores</button>
+      <button class="btn btn-deudores" id="btnDeudores"><span class="side-icon">💰</span> Deudores <span class="badge-count col-hidden" id="deudoresCount">0</span></button>
+      <button class="btn col-hidden" id="btnInformes"><span class="side-icon">📊</span> Informes</button>
+      <button class="btn" id="btnReporteDiario"><span class="side-icon">🧾</span> Reporte diario</button>
+      <button class="btn" id="btnPagoProfesional"><span class="side-icon">💵</span> Calcular pago profesional</button>
+      <button class="btn col-hidden" id="btnImportar"><span class="side-icon">⬆</span> Importar catálogo</button>
     </div>
   </div>
 
@@ -435,7 +436,12 @@
   <div class="modal">
     <button class="close-x" id="closeModal">✕</button>
     <h2>Nuevo movimiento</h2>
-    <div class="modal-sub">Se agrega con la fecha de hoy, <span id="fechaModal"></span></div>
+    <div class="modal-sub">Completá los datos del movimiento.</div>
+
+    <div class="field">
+      <label>Fecha</label>
+      <input type="date" id="inpFechaMovimiento">
+    </div>
 
     <div class="field" id="campoPacienteIngreso">
       <label>Paciente / Alumno</label>
@@ -1219,7 +1225,6 @@ function renderTabla(){
    CAJA: APERTURA / CIERRE
    ===================================================================== */
 document.getElementById('fechaHoy').textContent = new Date().toLocaleDateString('es-AR',{weekday:'long', day:'numeric', month:'long'});
-document.getElementById('fechaModal').textContent = new Date().toLocaleDateString('es-AR');
 
 function calcularEsperadoCaja(){
   if(!cajaActual) return 0;
@@ -1474,6 +1479,7 @@ document.getElementById('btnNuevo').onclick = ()=>{
   modalTitle.textContent = "Nuevo movimiento";
   btnGuardarMov.textContent = "Guardar movimiento";
   btnEliminar.classList.add('col-hidden');
+  document.getElementById('inpFechaMovimiento').value = hoyISO();
   overlay.classList.add('show');
 };
 
@@ -1487,6 +1493,7 @@ function abrirEdicion(id){
 
   selPaciente.value = m.pac;
   document.getElementById('inpDestinatario').value = m.pac;
+  document.getElementById('inpFechaMovimiento').value = m.fechaISO;
   selProfesional.value = m.prof;
   actualizarConceptosDesdeProfesional();
   selConcepto.value = m.concepto;
@@ -1512,6 +1519,7 @@ document.getElementById('cancelMov').onclick = cerrarModal;
 function cerrarModal(){ overlay.classList.remove('show'); resetModal(); }
 function resetModal(){
   montoAutoSync = null;
+  document.getElementById('inpFechaMovimiento').value = hoyISO();
   selPaciente.value = "";
   document.getElementById('inpDestinatario').value = "";
   document.getElementById('campoPacienteIngreso').classList.remove('col-hidden');
@@ -1648,7 +1656,8 @@ btnGuardarMov.onclick = async ()=>{
   }
 
   const radioSaldar = document.querySelector('input[name="saldarDeuda"]:checked');
-  const fechaISO = hoyISO();
+  const fechaISO = document.getElementById('inpFechaMovimiento').value || hoyISO();
+  if(!document.getElementById('inpFechaMovimiento').value){ alert("Elegí una fecha."); return; }
   const fechaDisplay = isoToDisplay(fechaISO);
   const codigo = CODIGO_POR_CONCEPTO[selProfesional.value+"||"+selConcepto.value] || "";
   const pendienteDeuda = tieneDeudaPendiente(pagos);
