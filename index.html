@@ -1030,6 +1030,10 @@ function suscribirMovimientos(){
     .onSnapshot(snap=>{
       movimientos = snap.docs.map(d=> ({id:d.id, ...d.data()}));
       renderTabla();
+    }, err=>{
+      tbody.innerHTML = `<tr><td colspan="10" style="padding:20px;text-align:left;color:#a13a3a;">
+        No se pudieron cargar los movimientos: ${err.message}
+      </td></tr>`;
     });
 }
 
