@@ -2214,7 +2214,7 @@ function filaProfesionalHTML(p, esNueva){
         <option value="egreso" ${p.tipo==='egreso'?'selected':''}>Egreso</option>
       </select>
       <button class="btn-guardar-fila" onclick="${esNueva ? 'crearProfesionalFila(this)' : 'guardarProfesionalFila(this)'}">${esNueva ? "Crear" : "Guardar"}</button>
-      ${(esNueva || !p.id) ? "" : `<button class="btn-eliminar-fila" onclick="eliminarProfesionalFila('${p.id}', this)" title="Eliminar">✕</button>`}
+      ${esNueva ? "" : `<button class="btn-eliminar-fila" onclick="eliminarProfesionalFila('${p.id||''}', '${p.nombre}', this)" title="Eliminar">✕</button>`}
     </div>
   `;
 }
@@ -2267,11 +2267,23 @@ async function guardarProfesionalFila(btn){
 }
 window.guardarProfesionalFila = guardarProfesionalFila;
 
-async function eliminarProfesionalFila(id, btn){
-  if(!confirm("¿Eliminar este profesional/área? Los conceptos que tenga asignados no se borran, pero van a quedar sin tipo definido hasta que los reasignes.")) return;
+async function eliminarProfesionalFila(id, nombre, btn){
+  const cantidadConceptos = (CONCEPTOS[nombre]||[]).length;
+  const mensaje = cantidadConceptos
+    ? `Este profesional/área tiene ${cantidadConceptos} concepto(s) asignados. Al eliminarlo se van a borrar también esos conceptos. ¿Confirmás?`
+    : "¿Eliminar este profesional/área? Esta acción no se puede deshacer.";
+  if(!confirm(mensaje)) return;
   btn.disabled = true;
   try{
-    await db.collection('profesionales').doc(id).delete();
+    if(id){
+      await db.collection('profesionales').doc(id).delete();
+    }
+    if(cantidadConceptos){
+      const snap = await db.collection('conceptos').where('profesional','==', nombre).get();
+      const lote = db.batch();
+      snap.docs.forEach(d=> lote.delete(d.ref));
+      await lote.commit();
+    }
   }catch(e){
     alert("No se pudo eliminar: " + e.message);
     btn.disabled = false;
