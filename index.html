@@ -1679,7 +1679,7 @@ btnGuardarMov.onclick = async ()=>{
   if(!selProfesional.value){ alert("Elegí un profesional/área."); return; }
   if(!selConcepto.value){ alert("Elegí un concepto."); return; }
   const valorNum = Number(inpValor.value.replace(/\D/g,""));
-  if(!valorNum){ alert("Ingresá un total."); return; }
+  if(inpValor.value.trim() === "" || isNaN(valorNum)){ alert("Ingresá un total (puede ser 0)."); return; }
 
   let pagos = leerPagosForm();
   const sumaPagos = pagos.reduce((a,p)=>a+p.valor,0);
