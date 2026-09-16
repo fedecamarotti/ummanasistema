@@ -1829,6 +1829,16 @@ document.getElementById('generarReporteFecha').onclick = async ()=>{
   btn.disabled = false; btn.textContent = "Generar PDF";
 };
 
+function limpiarTextoPDF(str){
+  if(str===null || str===undefined) return "";
+  return String(str)
+    .replace(/[\u200B-\u200D\uFEFF\uFE00-\uFE0F]/g, '')  // selectores de variación (emoji), invisibles
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/[^\x20-\x7EáéíóúÁÉÍÓÚñÑüÜ¿¡®°]/g, '');      // cualquier otro carácter no soportado, se descarta
+}
+
 function generarPDFReporteDiario(filas, fechaISO, sesiones){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({orientation:'landscape', unit:'pt', format:'a4'});
@@ -1849,7 +1859,7 @@ function generarPDFReporteDiario(filas, fechaISO, sesiones){
   const body = filas.map(m=>[
     m.fechaDisplay, m.pac, m.prof, m.codigo||"", m.concepto, m.notas||"",
     fmtTotal(m), medioDisplayText(m), cobroTextoPlano(m)
-  ]);
+  ].map(limpiarTextoPDF));
   doc.autoTable({
     startY: 64,
     head: [["Fecha","Paciente/Alumno","Profesional","Código","Concepto","Notas","Total","Medio de pago","Cobró"]],
@@ -1924,7 +1934,7 @@ function generarPDFReporteDiario(filas, fechaISO, sesiones){
       margin:{left: colIzq},
       tableWidth: 340,
       head: [["Profesional","Total"]],
-      body: pagosProfesionales.map(m=>[m.pac, fmtTotal(m)]),
+      body: pagosProfesionales.map(m=>[limpiarTextoPDF(m.pac), fmtTotal(m)]),
       styles:{font:'helvetica', fontSize:9, cellPadding:5, textColor:TEXTO},
       headStyles:{fillColor:MORADO, textColor:255},
     });
@@ -2039,12 +2049,12 @@ document.getElementById('btnExportarPago').onclick = ()=>{
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({orientation:'landscape', unit:'pt', format:'a4'});
   doc.setFont('helvetica','bold'); doc.setFontSize(14);
-  doc.text(`CAJA UMMANA — Pago a profesional: ${prof}`, 40, 40);
+  doc.text(`CAJA UMMANA - Pago a profesional: ${limpiarTextoPDF(prof)}`, 40, 40);
   doc.setFont('helvetica','normal'); doc.setFontSize(10);
   const [y_,m_,d_] = fechaISO.split('-');
   doc.text(`${d_}/${m_}/${y_}`, 40, 58);
 
-  const body = lineas.map(l=>[l.pac, l.concepto, l.notas||"", fmtMonto(l.valor, l.moneda), l.cobradoPor==='profesional' ? "Cobró el profesional" : "Cobró Ummana"]);
+  const body = lineas.map(l=>[l.pac, l.concepto, l.notas||"", fmtMonto(l.valor, l.moneda), l.cobradoPor==='profesional' ? "Cobró el profesional" : "Cobró Ummana"].map(limpiarTextoPDF));
   doc.autoTable({
     startY: 72, head: [["Paciente/Alumno","Concepto","Notas","Monto","¿Quién cobró?"]], body,
     styles:{font:'helvetica', fontSize:9, cellPadding:5}, headStyles:{fillColor:[111,106,248], textColor:255},
