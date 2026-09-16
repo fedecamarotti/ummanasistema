@@ -117,15 +117,24 @@
   td.left, th.left{text-align:left;}
   thead th{
     background:#fafafa;font-weight:700;font-size:9.5px;text-transform:uppercase;letter-spacing:0.4px;
-    color:var(--muted);padding:8px 9px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2;
+    color:var(--muted);padding:0;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2;
   }
+  .th-search{
+    width:100%;box-sizing:border-box;border:none;background:transparent;outline:none;
+    font-family:inherit;font-weight:700;font-size:9.5px;text-transform:uppercase;letter-spacing:0.4px;
+    color:var(--muted);text-align:center;padding:9px 8px;
+  }
+  .th-search::placeholder{color:#c2c4ca;text-transform:uppercase;letter-spacing:0.4px;font-weight:700;font-size:9.5px;}
+  .th-search:focus{background:#fff;color:var(--text);}
+  .th-search-left{text-align:left;}
   .editcol{width:34px;padding:0;}
   .editbtn{border:none;background:transparent;font-size:13px;padding:6px;color:#b5b7bd;border-radius:6px;}
   .editbtn:hover{background:#f0f0f3;color:var(--accent);}
   td.concepto{white-space:nowrap;font-size:10.5px;line-height:1.2;}
   td.codigo{color:var(--muted);font-size:10.5px;}
   td.notas{color:#5b5e66;font-size:10.5px;max-width:180px;white-space:normal;}
-  td.total{font-weight:700;font-size:10.5px;}
+  td.total{font-size:10.5px;}
+  td.total.ingreso, td.total.egreso{font-weight:700;}
   td.total.ingreso{background:#e3f1de;color:#2f7a2f;}
   td.total.egreso{background:#fbeaea;color:#a13a3a;}
   tbody tr:hover td{filter:brightness(0.98);}
@@ -191,9 +200,6 @@
   .empty-state{text-align:center;color:var(--muted);font-size:12.5px;padding:30px 10px;}
   .warn-banner{background:#fff4e5;border:1px solid #f0c36d;color:#8a6100;padding:10px 12px;border-radius:8px;font-size:12px;font-weight:600;margin-top:6px;}
 
-  .filterbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:14px 28px 0;}
-  .filterbar .btn{padding:7px 12px;font-size:11.5px;}
-  .filterbar input[type=text]{width:100%;min-width:170px;padding:7px 10px;font-size:11.5px;}
   .deuda-mini{border:1px solid #f3d3d3;background:#fdf4f4;border-radius:8px;padding:10px 12px;margin-bottom:6px;}
   .deuda-mini label{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:600;color:#a13a3a;text-transform:none;letter-spacing:0;cursor:pointer;}
   .deuda-mini .det{font-weight:500;color:var(--muted);font-size:10.5px;margin-left:22px;margin-top:2px;}
@@ -208,7 +214,6 @@
   .ac-option{padding:8px 12px;font-size:12px;cursor:pointer;}
   .ac-option:hover, .ac-option.activo{background:#f1f1f8;}
   .ac-empty{padding:8px 12px;font-size:11px;color:var(--muted);}
-  .filterbar .ac-wrap{min-width:170px;flex:1;}
   .combo .ac-wrap{flex:1;}
 
   .kpi-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
@@ -358,29 +363,23 @@
 
     <div class="panel-container" id="panelContainer">
       <div id="panelContent">
-        <div class="filterbar">
-          <div class="ac-wrap"><input type="text" id="filtroFecha" placeholder="Buscar fecha… ej. 10/9" autocomplete="off"></div>
-          <div class="ac-wrap"><input type="text" id="filtroPaciente" placeholder="Buscar paciente/alumno…" autocomplete="off"></div>
-          <div class="ac-wrap"><input type="text" id="filtroProfesional" placeholder="Buscar profesional/área…" autocomplete="off"></div>
-          <div class="ac-wrap"><input type="text" id="filtroConcepto" placeholder="Buscar concepto…" autocomplete="off"></div>
-          <div class="ac-wrap"><input type="text" id="filtroMedio" placeholder="Buscar tipo de movimiento…" autocomplete="off"></div>
+        <div style="margin:0 0 10px;">
           <button class="btn" id="btnLimpiarFiltros">Limpiar filtros</button>
         </div>
-        <br>
         <div class="sheet-wrap">
         <table>
           <thead>
             <tr>
               <th class="editcol"></th>
-              <th>Fecha</th>
-              <th>Paciente/Alumno</th>
-              <th>Profesional</th>
-              <th>Código</th>
-              <th>Concepto</th>
-              <th>Notas/Detalle</th>
-              <th>Total</th>
-              <th>Medio de pago</th>
-              <th>Cobró</th>
+              <th><input type="text" class="th-search" id="filtroFecha" placeholder="Fecha" autocomplete="off"></th>
+              <th><input type="text" class="th-search th-search-left" id="filtroPaciente" placeholder="Paciente/Alumno" autocomplete="off"></th>
+              <th><input type="text" class="th-search" id="filtroProfesional" placeholder="Profesional" autocomplete="off"></th>
+              <th><input type="text" class="th-search" id="filtroCodigo" placeholder="Código" autocomplete="off"></th>
+              <th><input type="text" class="th-search" id="filtroConcepto" placeholder="Concepto" autocomplete="off"></th>
+              <th><input type="text" class="th-search" id="filtroNotas" placeholder="Notas/Detalle" autocomplete="off"></th>
+              <th><input type="text" class="th-search" id="filtroTotal" placeholder="Total" autocomplete="off"></th>
+              <th><input type="text" class="th-search" id="filtroMedio" placeholder="Medio de pago" autocomplete="off"></th>
+              <th><input type="text" class="th-search" id="filtroCobro" placeholder="Cobró" autocomplete="off"></th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
@@ -909,15 +908,25 @@ function medioBadgesHTML(m){
     return `<span class="badge badge-${p.medio}">${medioLabelDe(p.medio, m.moneda)}${montoTxt}</span>`;
   }).join('');
 }
-function cobroBadgesHTML(m){
+function cobroDesglose(m){
   const pagos = pagosDe(m);
   const totalUmmana = pagos.filter(p=>p.cobradoPor!=="profesional").reduce((a,p)=>a+p.valor,0);
   const totalProfesional = pagos.filter(p=>p.cobradoPor==="profesional").reduce((a,p)=>a+p.valor,0);
-  const hayAmbos = totalUmmana>0 && totalProfesional>0;
+  return {totalUmmana, totalProfesional, hayAmbos: totalUmmana>0 && totalProfesional>0};
+}
+function cobroBadgesHTML(m){
+  const {totalUmmana, totalProfesional, hayAmbos} = cobroDesglose(m);
   const lineas = [];
   if(totalUmmana>0) lineas.push(`Ummana${hayAmbos ? " " + fmtMonto(totalUmmana, m.moneda) : ""}`);
   if(totalProfesional>0) lineas.push(`Profesional${hayAmbos ? " " + fmtMonto(totalProfesional, m.moneda) : ""}`);
   return lineas.join('<br>');
+}
+function cobroTextoPlano(m){
+  const {totalUmmana, totalProfesional, hayAmbos} = cobroDesglose(m);
+  const partes = [];
+  if(totalUmmana>0) partes.push(`Ummana${hayAmbos ? " " + fmtMonto(totalUmmana, m.moneda) : ""}`);
+  if(totalProfesional>0) partes.push(`Profesional${hayAmbos ? " " + fmtMonto(totalProfesional, m.moneda) : ""}`);
+  return partes.join(' / ');
 }
 function tieneDeudaPendiente(pagos){
   return pagos.some(p=>p.medio==="debe" && !p.saldada);
@@ -1194,19 +1203,17 @@ function attachAutocomplete(input, getOptions, onPick){
 const filtroFecha = document.getElementById('filtroFecha');
 const filtroPaciente = document.getElementById('filtroPaciente');
 const filtroProfesional = document.getElementById('filtroProfesional');
+const filtroCodigo = document.getElementById('filtroCodigo');
 const filtroConcepto = document.getElementById('filtroConcepto');
+const filtroNotas = document.getElementById('filtroNotas');
+const filtroTotal = document.getElementById('filtroTotal');
 const filtroMedio = document.getElementById('filtroMedio');
+const filtroCobro = document.getElementById('filtroCobro');
 
-attachAutocomplete(filtroFecha, ()=> [...new Set(movimientos.map(m=>m.fechaDisplay))].sort(compareFechas));
-attachAutocomplete(filtroPaciente, ()=> [...new Set(movimientos.map(m=>m.pac))].sort());
-attachAutocomplete(filtroProfesional, ()=> Object.keys(CONCEPTOS));
-attachAutocomplete(filtroConcepto, ()=> [...new Set(movimientos.map(m=>m.concepto))]);
-attachAutocomplete(filtroMedio, ()=> ["Efectivo","Mercado Pago","Tarjeta","Transferencia","Debe","Saldado"]);
-
-[filtroFecha, filtroPaciente, filtroProfesional, filtroConcepto, filtroMedio].forEach(f=> f.addEventListener('input', renderTabla));
+const filtrosTabla = [filtroFecha, filtroPaciente, filtroProfesional, filtroCodigo, filtroConcepto, filtroNotas, filtroTotal, filtroMedio, filtroCobro];
+filtrosTabla.forEach(f=> f.addEventListener('input', renderTabla));
 document.getElementById('btnLimpiarFiltros').onclick = ()=>{
-  filtroFecha.value = ""; filtroPaciente.value = ""; filtroProfesional.value = "";
-  filtroConcepto.value = ""; filtroMedio.value = "";
+  filtrosTabla.forEach(f=> f.value = "");
   renderTabla();
 };
 
@@ -1216,8 +1223,12 @@ function pasaFiltros(m){
   if(filtroFecha.value && !contiene(m.fechaDisplay, filtroFecha.value)) return false;
   if(filtroPaciente.value && !contiene(m.pac, filtroPaciente.value)) return false;
   if(filtroProfesional.value && !contiene(m.prof, filtroProfesional.value)) return false;
+  if(filtroCodigo.value && !contiene(m.codigo, filtroCodigo.value)) return false;
   if(filtroConcepto.value && !contiene(m.concepto, filtroConcepto.value)) return false;
+  if(filtroNotas.value && !contiene(m.notas, filtroNotas.value)) return false;
+  if(filtroTotal.value && !contiene(fmtTotal(m), filtroTotal.value)) return false;
   if(filtroMedio.value && !contiene(medioDisplayText(m), filtroMedio.value)) return false;
+  if(filtroCobro.value && !contiene(cobroTextoPlano(m), filtroCobro.value)) return false;
   return true;
 }
 
@@ -1234,7 +1245,7 @@ function renderTabla(){
       <td class="codigo">${m.codigo||""}</td>
       <td class="concepto">${m.concepto}</td>
       <td class="notas">${m.notas||""}</td>
-      <td class="total ${esGasto?'egreso':'ingreso'}">${fmtTotal(m)}</td>
+      <td class="total ${m.valor==0 ? '' : (esGasto?'egreso':'ingreso')}">${fmtTotal(m)}</td>
       <td class="badges-cell">${medioBadgesHTML(m)}</td>
       <td class="concepto">${cobroBadgesHTML(m)}</td>
     `;
@@ -1802,10 +1813,15 @@ document.getElementById('generarReporteFecha').onclick = async ()=>{
   const btn = document.getElementById('generarReporteFecha');
   btn.disabled = true; btn.textContent = "Generando…";
   try{
-    const snap = await db.collection('movimientos').where('fechaISO','==', fechaISO).get();
-    const filas = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    const [snapMov, snapCaja] = await Promise.all([
+      db.collection('movimientos').where('fechaISO','==', fechaISO).get(),
+      db.collection('cajaSesiones').where('fechaISO','==', fechaISO).get(),
+    ]);
+    const filas = snapMov.docs.map(d=>({id:d.id, ...d.data()}));
     if(!filas.length){ alert("No hay movimientos cargados en esa fecha."); return; }
-    generarPDFReporteDiario(filas, fechaISO);
+    const sesiones = snapCaja.docs.map(d=> d.data())
+      .sort((a,b)=> (a.abiertaEn?.toMillis()||0) - (b.abiertaEn?.toMillis()||0));
+    generarPDFReporteDiario(filas, fechaISO, sesiones);
     overlayReporteFecha.classList.remove('show');
   }catch(e){
     alert("Error al generar el reporte: " + e.message);
@@ -1813,42 +1829,129 @@ document.getElementById('generarReporteFecha').onclick = async ()=>{
   btn.disabled = false; btn.textContent = "Generar PDF";
 };
 
-function generarPDFReporteDiario(filas, fechaISO){
+function generarPDFReporteDiario(filas, fechaISO, sesiones){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({orientation:'landscape', unit:'pt', format:'a4'});
-  doc.setFont('helvetica','bold'); doc.setFontSize(14);
-  doc.text(`CAJA UMMANA — Reporte diario`, 40, 40);
-  doc.setFont('helvetica','normal'); doc.setFontSize(10);
-  const [y_, m_, d_] = fechaISO.split('-');
-  doc.text(`${d_}/${m_}/${y_}`, 40, 58);
+  const MORADO = [111,106,248];
+  const GRIS = [138,141,148];
+  const TEXTO = [36,38,43];
+  const VERDE_BG = [227,241,222], VERDE_TXT = [47,122,47];
+  const ROJO_BG = [251,234,234], ROJO_TXT = [161,58,58];
 
-  const body = filas.map(m=>[m.fechaDisplay, m.pac, m.prof, m.concepto, m.notas||"", fmtTotal(m), medioDisplayText(m)]);
+  // ---------- Encabezado ----------
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(...TEXTO);
+  doc.text('CAJA UMMANA', 40, 34);
+  const [y_, m_, d_] = fechaISO.split('-');
+  doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor(...GRIS);
+  doc.text(`Reporte diario — ${d_}/${m_}/${y_}`, 40, 50);
+
+  // ---------- Tabla principal (mismo orden y columnas que la pantalla) ----------
+  const body = filas.map(m=>[
+    m.fechaDisplay, m.pac, m.prof, m.codigo||"", m.concepto, m.notas||"",
+    fmtTotal(m), medioDisplayText(m), cobroTextoPlano(m)
+  ]);
   doc.autoTable({
-    startY: 72,
-    head: [["Fecha","Paciente/Alumno","Profesional","Concepto","Notas","Total","Medio de pago"]],
-    body, styles:{font:'helvetica', fontSize:9, cellPadding:5},
-    headStyles:{fillColor:[111,106,248], textColor:255},
-    alternateRowStyles:{fillColor:[247,247,250]},
+    startY: 64,
+    head: [["Fecha","Paciente/Alumno","Profesional","Código","Concepto","Notas","Total","Medio de pago","Cobró"]],
+    body,
+    styles:{font:'helvetica', fontSize:8, cellPadding:4.5, textColor:TEXTO, lineColor:[231,231,234], lineWidth:0.5},
+    headStyles:{fillColor:MORADO, textColor:255, fontStyle:'bold', fontSize:8},
+    alternateRowStyles:{fillColor:[250,250,252]},
+    columnStyles:{ 3:{cellWidth:42} },
+    didParseCell: (data)=>{
+      if(data.section==='body' && data.column.index===6){
+        const m = filas[data.row.index];
+        if(m.valor != 0){
+          data.cell.styles.fontStyle = 'bold';
+          if(esEgreso(m.prof)){ data.cell.styles.fillColor = ROJO_BG; data.cell.styles.textColor = ROJO_TXT; }
+          else { data.cell.styles.fillColor = VERDE_BG; data.cell.styles.textColor = VERDE_TXT; }
+        }
+      }
+    },
   });
 
-  let totalPesosIn=0, totalUsdIn=0, totalPesosOut=0, totalUsdOut=0;
+  // ---------- Cálculos para el resumen ----------
+  let inPesosEf=0, outPesosEf=0, inUsdEf=0, outUsdEf=0;
+  let inPesosMp=0, outPesosMp=0, inPesosTransf=0, outPesosTransf=0;
+  const pagosProfesionales = [];
   filas.forEach(m=>{
     const esGasto = esEgreso(m.prof);
-    if(esGasto){
-      if(m.moneda==="USD") totalUsdOut+=m.valor; else totalPesosOut+=m.valor;
-    } else {
-      pagosDe(m).forEach(p=>{
-        if(p.cobradoPor === "profesional") return;
-        if(m.moneda==="USD") totalUsdIn+=p.valor; else totalPesosIn+=p.valor;
-      });
-    }
+    if(/honorario/i.test(m.concepto||"")) pagosProfesionales.push(m);
+    pagosDe(m).forEach(p=>{
+      if(p.medio==="efectivo"){
+        if(m.moneda==="USD"){ esGasto ? outUsdEf+=p.valor : inUsdEf+=p.valor; }
+        else { esGasto ? outPesosEf+=p.valor : inPesosEf+=p.valor; }
+      } else if(p.medio==="mp" && m.moneda!=="USD"){
+        esGasto ? outPesosMp+=p.valor : inPesosMp+=p.valor;
+      } else if(p.medio==="transferencia" && m.moneda!=="USD"){
+        esGasto ? outPesosTransf+=p.valor : inPesosTransf+=p.valor;
+      }
+    });
   });
-  let y = doc.lastAutoTable.finalY + 24;
-  doc.setFontSize(10);
-  doc.text(`Ingresos:  $ ${totalPesosIn.toLocaleString('es-AR')}   ·   US$ ${totalUsdIn.toLocaleString('es-AR')}`, 40, y); y+=16;
-  doc.text(`Egresos:   $ ${totalPesosOut.toLocaleString('es-AR')}   ·   US$ ${totalUsdOut.toLocaleString('es-AR')}`, 40, y); y+=18;
+
+  const sesionApertura = sesiones[0];
+  const sesionesCerradas = sesiones.filter(s=>s.cerradaEn);
+  const sesionCierre = sesionesCerradas[sesionesCerradas.length-1];
+
+  let y = doc.lastAutoTable.finalY + 26;
+  const colIzq = 40, colDer = 430;
+
+  // ---------- CAJA DEL DÍA ----------
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...MORADO);
+  doc.text('CAJA DEL DÍA', colIzq, y);
+  let yCaja = y + 18;
+  doc.setFontSize(9.5); doc.setTextColor(...TEXTO);
+  doc.setFont('helvetica','normal');
+  doc.text('Caja inicial:', colIzq, yCaja);
+  doc.text(sesionApertura ? `$ ${Number(sesionApertura.aperturaMonto).toLocaleString('es-AR')}` : 'Sin registro', colIzq+90, yCaja);
+  yCaja += 15;
+  doc.text('Movimientos en efectivo (neto, cobro Ummana + profesional):', colIzq, yCaja);
+  yCaja += 15;
+  doc.text(`$ ${(inPesosEf-outPesosEf).toLocaleString('es-AR')}   ·   US$ ${(inUsdEf-outUsdEf).toLocaleString('es-AR')}`, colIzq+10, yCaja);
+  yCaja += 17;
   doc.setFont('helvetica','bold');
-  doc.text(`Saldo neto: $ ${(totalPesosIn-totalPesosOut).toLocaleString('es-AR')}   ·   US$ ${(totalUsdIn-totalUsdOut).toLocaleString('es-AR')}`, 40, y);
+  doc.text('Caja final:', colIzq, yCaja);
+  doc.text(sesionCierre ? `$ ${Number(sesionCierre.montoContado).toLocaleString('es-AR')}` : 'Sin cierre registrado', colIzq+90, yCaja);
+  yCaja += 22;
+
+  // ---------- DETALLE PAGOS PROFESIONALES ----------
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...MORADO);
+  doc.text('DETALLE PAGOS PROFESIONALES DEL DÍA', colIzq, yCaja);
+  yCaja += 8;
+  if(pagosProfesionales.length){
+    doc.autoTable({
+      startY: yCaja,
+      margin:{left: colIzq},
+      tableWidth: 340,
+      head: [["Profesional","Total"]],
+      body: pagosProfesionales.map(m=>[m.pac, fmtTotal(m)]),
+      styles:{font:'helvetica', fontSize:9, cellPadding:5, textColor:TEXTO},
+      headStyles:{fillColor:MORADO, textColor:255},
+    });
+  } else {
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GRIS);
+    doc.text('No hubo retiros de honorarios registrados este día.', colIzq, yCaja+14);
+  }
+
+  // ---------- INGRESOS VS EGRESOS DEL DÍA ----------
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...MORADO);
+  doc.text('INGRESOS VS EGRESOS DEL DÍA', colDer, y);
+  doc.autoTable({
+    startY: y+10,
+    margin:{left: colDer},
+    tableWidth: 380,
+    head: [["Medio","Ingresos","Egresos"]],
+    body: [
+      ["Efectivo $", `$ ${inPesosEf.toLocaleString('es-AR')}`, `$ ${outPesosEf.toLocaleString('es-AR')}`],
+      ["Efectivo USD", `US$ ${inUsdEf.toLocaleString('es-AR')}`, `US$ ${outUsdEf.toLocaleString('es-AR')}`],
+      ["Mercado Pago", `$ ${inPesosMp.toLocaleString('es-AR')}`, `$ ${outPesosMp.toLocaleString('es-AR')}`],
+      ["Transferencia", `$ ${inPesosTransf.toLocaleString('es-AR')}`, `$ ${outPesosTransf.toLocaleString('es-AR')}`],
+    ],
+    styles:{font:'helvetica', fontSize:9, cellPadding:5, textColor:TEXTO},
+    headStyles:{fillColor:MORADO, textColor:255},
+    columnStyles:{1:{textColor:VERDE_TXT, fontStyle:'bold'}, 2:{textColor:ROJO_TXT, fontStyle:'bold'}},
+  });
+
   doc.save(`reporte-diario-${fechaISO}.pdf`);
 }
 
