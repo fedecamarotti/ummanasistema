@@ -112,25 +112,25 @@
     margin:22px 28px 40px;background:#fff;border:1px solid var(--border);border-radius:12px;
     overflow:auto;box-shadow:0 1px 3px rgba(20,20,30,0.04);
   }
-  table{border-collapse:collapse;width:100%;font-size:11px;min-width:900px;}
-  th,td{border-bottom:1px solid var(--border);padding:4px 9px;text-align:center;white-space:nowrap;line-height:1.2;}
+  table{border-collapse:collapse;width:100%;font-size:10.5px;min-width:900px;}
+  th,td{border-bottom:1px solid var(--border);padding:3px 9px;text-align:center;white-space:nowrap;line-height:1.2;}
   td.left, th.left{text-align:left;}
   thead th{
     background:#fafafa;font-weight:700;font-size:9.5px;text-transform:uppercase;letter-spacing:0.4px;
-    color:var(--muted);padding:9px 9px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2;
+    color:var(--muted);padding:8px 9px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2;
   }
   .editcol{width:34px;padding:0;}
   .editbtn{border:none;background:transparent;font-size:13px;padding:6px;color:#b5b7bd;border-radius:6px;}
   .editbtn:hover{background:#f0f0f3;color:var(--accent);}
   td.concepto{white-space:nowrap;font-size:10.5px;line-height:1.2;}
-  td.codigo{color:var(--muted);font-size:10px;}
+  td.codigo{color:var(--muted);font-size:10.5px;}
   td.notas{color:#5b5e66;font-size:10.5px;max-width:180px;white-space:normal;}
-  td.total{font-weight:700;font-size:11px;}
+  td.total{font-weight:700;font-size:10.5px;}
   td.total.ingreso{background:#e3f1de;color:#2f7a2f;}
   td.total.egreso{background:#fbeaea;color:#a13a3a;}
   tbody tr:hover td{filter:brightness(0.98);}
 
-  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap;}
   .badge-efectivo{background:#dff3d8;color:#2f7a2f;}
   .badge-mp{background:#d8eefa;color:#1c7fa8;}
   .badge-transferencia{background:#dde3fb;color:#3d4ec2;}
@@ -276,7 +276,8 @@
     border-radius:8px;color:#c62828;font-size:14px;
   }
   .pago-row .btn-quitar:hover{background:#fdeeee;}
-  .badges-cell{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;white-space:normal !important;}
+  .badges-cell{white-space:normal !important;}
+  .badges-cell .badge{margin:1px 2px;}
 
   .caja-row{
     border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;
@@ -517,7 +518,9 @@
 
     <div class="field">
       <label>Concepto</label>
-      <select id="selConcepto" disabled><option value="">Elegí primero un profesional/área…</option></select>
+      <div class="ac-wrap">
+        <input type="text" id="selConcepto" placeholder="Elegí primero un profesional/área…" autocomplete="off" disabled>
+      </div>
     </div>
 
     <div class="field">
@@ -908,12 +911,13 @@ function medioBadgesHTML(m){
 }
 function cobroBadgesHTML(m){
   const pagos = pagosDe(m);
-  const varios = pagos.length > 1;
-  return pagos.map(p=>{
-    const montoTxt = varios ? ` ${fmtMonto(p.valor, m.moneda)}` : "";
-    const esProf = p.cobradoPor === "profesional";
-    return `${esProf?'Profesional':'Ummana'}${montoTxt}`;
-  }).join(', ');
+  const totalUmmana = pagos.filter(p=>p.cobradoPor!=="profesional").reduce((a,p)=>a+p.valor,0);
+  const totalProfesional = pagos.filter(p=>p.cobradoPor==="profesional").reduce((a,p)=>a+p.valor,0);
+  const hayAmbos = totalUmmana>0 && totalProfesional>0;
+  const lineas = [];
+  if(totalUmmana>0) lineas.push(`Ummana${hayAmbos ? " " + fmtMonto(totalUmmana, m.moneda) : ""}`);
+  if(totalProfesional>0) lineas.push(`Profesional${hayAmbos ? " " + fmtMonto(totalProfesional, m.moneda) : ""}`);
+  return lineas.join('<br>');
 }
 function tieneDeudaPendiente(pagos){
   return pagos.some(p=>p.medio==="debe" && !p.saldada);
@@ -1465,18 +1469,23 @@ function ordenarConceptos(profesional, opts){
   return copia;
 }
 
+let conceptosDisponiblesActual = [];
+
 function actualizarConceptosDesdeProfesional(){
   const opts = CONCEPTOS[selProfesional.value] || [];
   if(opts.length){
     selConcepto.disabled = false;
-    const ordenados = ordenarConceptos(selProfesional.value, opts);
-    selConcepto.innerHTML = ordenados.map(c=>`<option value="${c.concepto}">${c.codigo ? c.codigo + " - " : ""}${c.concepto}</option>`).join('');
+    selConcepto.placeholder = "Escribí para buscar…";
+    conceptosDisponiblesActual = ordenarConceptos(selProfesional.value, opts);
   } else {
     selConcepto.disabled = true;
-    selConcepto.innerHTML = '<option value="">Sin conceptos configurados</option>';
+    selConcepto.value = "";
+    selConcepto.placeholder = "Sin conceptos configurados";
+    conceptosDisponiblesActual = [];
   }
   actualizarCampoPacienteSegunTipo();
 }
+attachAutocomplete(selConcepto, ()=> conceptosDisponiblesActual.map(c=>c.concepto));
 
 function actualizarCampoPacienteSegunTipo(){
   const egreso = esEgreso(selProfesional.value);
@@ -1565,8 +1574,10 @@ function resetModal(){
   document.getElementById('campoPacienteEgreso').classList.add('col-hidden');
   document.getElementById('cardNuevoProveedor').classList.add('col-hidden');
   selProfesional.value = "";
-  selConcepto.innerHTML = '<option value="">Elegí primero un profesional/área…</option>';
+  selConcepto.value = "";
+  selConcepto.placeholder = "Elegí primero un profesional/área…";
   selConcepto.disabled = true;
+  conceptosDisponiblesActual = [];
   document.getElementById('inpNotas').value = "";
   inpValor.value = "";
   document.querySelectorAll('.currency-toggle button').forEach(b=>b.classList.remove('active'));
@@ -1638,14 +1649,8 @@ document.getElementById('deudasPacienteLista').addEventListener('change', (e)=>{
   if(!deuda) return;
   selProfesional.value = deuda.prof;
   actualizarConceptosDesdeProfesional();
-  const conceptoSalda = `Salda deuda del ${deuda.fechaDisplay}`;
-  if(![...selConcepto.options].some(o=>o.value===conceptoSalda)){
-    const opt = document.createElement('option');
-    opt.value = conceptoSalda; opt.textContent = conceptoSalda;
-    selConcepto.insertBefore(opt, selConcepto.firstChild);
-  }
   selConcepto.disabled = false;
-  selConcepto.value = conceptoSalda;
+  selConcepto.value = `Salda deuda del ${deuda.fechaDisplay}`;
 });
 
 document.querySelectorAll('.currency-toggle button').forEach(btn=>{
@@ -1688,7 +1693,10 @@ btnGuardarMov.onclick = async ()=>{
     return;
   }
   if(sumaPagos < valorNum){
-    pagos.push({medio:"debe", valor: valorNum - sumaPagos, saldada:false, fechaSaldadoISO:null, fechaSaldadoDisplay:null});
+    // Si hay un solo pago cargado, la parte que queda como deuda se la debe el mismo que cobró ese pago.
+    // Si hay varios (o ninguno), por defecto se la debe a Ummana.
+    const cobradoPorDeuda = pagos.length === 1 ? pagos[0].cobradoPor : "ummana";
+    pagos.push({medio:"debe", valor: valorNum - sumaPagos, cobradoPor: cobradoPorDeuda, saldada:false, fechaSaldadoISO:null, fechaSaldadoDisplay:null});
   }
   if(egreso && pagos.some(p=>p.medio==="debe")){
     alert('Un gasto no puede quedar como "Debe" — revisá que los pagos cubran el total completo.');
