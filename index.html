@@ -17,6 +17,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <style>
   :root{
@@ -102,6 +103,8 @@
   .btn:hover{background:#f0e8cf;}
   .btn:disabled{opacity:0.45;cursor:not-allowed;}
   .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+  #btnNuevo{background:#c9b183;color:#3a2f1c;border-color:#c9b183;}
+  #btnNuevo:hover{background:#bfa473;}
   .btn-primary:hover{background:var(--accent-dk);}
   .btn-deudores{position:relative;}
   .badge-count{
@@ -111,7 +114,7 @@
 
   /* ---------- Sheet wrapper ---------- */
   .sheet-wrap{
-    margin:22px 28px 40px;background:#fffcf5;border:1px solid var(--border);border-radius:12px;
+    margin:12px 28px 40px;background:#fffcf5;border:1px solid var(--border);border-radius:12px;
     overflow:auto;box-shadow:0 1px 3px rgba(20,20,30,0.04);
   }
   table{border-collapse:collapse;font-size:10.5px;}
@@ -137,8 +140,8 @@
   td.notas{color:#5b5e66;font-size:10.5px;width:200px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:default;}
   td.total{font-size:10.5px;}
   td.total.ingreso, td.total.egreso{font-weight:700;}
-  td.total.ingreso{background:#e3f1de;color:#2f7a2f;}
-  td.total.egreso{background:#fbeaea;color:#a13a3a;}
+  td.total.ingreso{color:#2f7a2f;}
+  td.total.egreso{color:#a13a3a;}
   tbody tr:hover td{filter:brightness(0.98);}
 
   .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;white-space:nowrap;}
@@ -147,7 +150,7 @@
   .badge-transferencia{background:#dde3fb;color:#3d4ec2;}
   .badge-tarjeta{background:#ece2fb;color:#7a3fc9;}
   .badge-debe{background:#fbdada;color:#c62828;}
-  .badge-saldado{background:#e6dbc2;color:#7a7159;}
+  .badge-pagado{background:#fdf3d0;color:#8a6d16;}
 
   .hint{font-size:11.5px;color:var(--muted);padding:0 28px;font-weight:500;}
 
@@ -220,6 +223,7 @@
 
   .kpi-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
   .kpi{background:#f6f0de;border:1px solid var(--border);border-radius:10px;padding:12px 16px;min-width:150px;}
+  .rv-section-title{font-size:12.5px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:10px;}
   .kpi .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;font-weight:700;}
   .kpi .val{font-size:16px;font-weight:700;margin-top:4px;}
 
@@ -364,9 +368,6 @@
 
     <div class="panel-container" id="panelContainer">
       <div id="panelContent">
-        <div style="margin:0 0 10px;">
-          <button class="btn" id="btnLimpiarFiltros">Limpiar filtros</button>
-        </div>
         <div class="sheet-wrap">
         <table>
           <thead>
@@ -558,6 +559,39 @@
   </div>
 </div>
 
+<!-- ============ CONTENEDOR OCULTO PARA EXPORTAR EL REPORTE COMO IMAGEN ============ -->
+<div id="reporteVisualHidden" style="position:fixed;left:-99999px;top:0;width:1400px;background:#f8f3e8;padding:28px;font-family:'Montserrat',sans-serif;">
+  <div style="margin-bottom:18px;">
+    <div style="font-size:20px;font-weight:700;color:#24262b;">Reporte día <span id="rvFecha"></span></div>
+    <div style="font-size:12px;color:#9c9179;margin-top:2px;">CAJA UMMANA</div>
+  </div>
+  <div class="sheet-wrap" style="margin:0;">
+    <table style="width:100%;">
+      <thead>
+        <tr>
+          <th>Fecha</th><th class="left">Paciente/Alumno</th><th>Profesional</th><th>Código</th>
+          <th>Concepto</th><th>Notas/Detalle</th><th>Total</th><th>Medio de pago</th><th>Cobró</th>
+        </tr>
+      </thead>
+      <tbody id="rvTbody"></tbody>
+    </table>
+  </div>
+
+  <div style="display:flex;gap:24px;margin-top:24px;align-items:flex-start;">
+    <div style="flex:1;">
+      <div class="rv-section-title">Caja del día</div>
+      <div id="rvCaja"></div>
+
+      <div class="rv-section-title" style="margin-top:20px;">Detalle pagos profesionales del día</div>
+      <div id="rvPagosProf"></div>
+    </div>
+    <div style="flex:1;">
+      <div class="rv-section-title">Ingresos vs Egresos del día</div>
+      <div class="sheet-wrap" style="margin:0;" id="rvIngresosEgresos"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ============ MODAL: FECHA DEL REPORTE DIARIO ============ -->
 <div class="overlay" id="overlayReporteFecha">
   <div class="modal">
@@ -575,15 +609,18 @@
   </div>
 </div>
 
-<!-- ============ MODAL: VISTA PREVIA DE PDF ============ -->
+<!-- ============ MODAL: VISTA PREVIA ============ -->
 <div class="overlay" id="overlayPreviewPDF">
-  <div class="modal" style="max-width:920px;">
+  <div class="modal" style="max-width:1100px;">
     <button class="close-x" id="closePreviewPDF">✕</button>
     <h2>Vista previa</h2>
-    <iframe id="iframePreviewPDF" style="width:100%;height:72vh;border:1px solid var(--border);border-radius:8px;margin-top:8px;"></iframe>
+    <div style="max-height:72vh;overflow:auto;border:1px solid var(--border);border-radius:8px;margin-top:8px;background:#f8f3e8;">
+      <iframe id="iframePreviewPDF" style="width:100%;height:72vh;border:none;display:none;"></iframe>
+      <img id="imgPreviewPNG" style="width:100%;display:none;">
+    </div>
     <div class="modal-actions">
       <button class="btn" id="cancelPreviewPDF">Cerrar</button>
-      <button class="btn btn-primary" id="descargarPreviewPDF">Descargar PDF</button>
+      <button class="btn btn-primary" id="descargarPreviewPDF">Descargar</button>
     </div>
   </div>
 </div>
@@ -906,7 +943,7 @@ function medioLabelDe(medio, moneda){
 }
 function medioDisplayText(m){
   return pagosDe(m).map(p=>{
-    if(p.medio==="debe") return p.saldada ? "Saldado" : "Debe";
+    if(p.medio==="debe") return p.saldada ? `Pagó ${fmtMonto(p.valor, m.moneda)} el ${p.fechaSaldadoDisplay}` : "Debe";
     return medioLabelDe(p.medio, m.moneda);
   }).join(', ');
 }
@@ -916,7 +953,7 @@ function medioBadgesHTML(m){
   return pagos.map(p=>{
     const montoTxt = varios ? ` ${fmtMonto(p.valor, m.moneda)}` : "";
     if(p.medio==="debe"){
-      if(p.saldada) return `<span class="badge badge-saldado">Saldado el ${p.fechaSaldadoDisplay}${montoTxt}</span>`;
+      if(p.saldada) return `<span class="badge badge-pagado">Pagó ${fmtMonto(p.valor, m.moneda)} el ${p.fechaSaldadoDisplay}</span>`;
       return `<span class="badge badge-debe">Debe${montoTxt}</span>`;
     }
     return `<span class="badge badge-${p.medio}">${medioLabelDe(p.medio, m.moneda)}${montoTxt}</span>`;
@@ -1226,10 +1263,6 @@ const filtroCobro = document.getElementById('filtroCobro');
 
 const filtrosTabla = [filtroFecha, filtroPaciente, filtroProfesional, filtroCodigo, filtroConcepto, filtroNotas, filtroTotal, filtroMedio, filtroCobro];
 filtrosTabla.forEach(f=> f.addEventListener('input', renderTabla));
-document.getElementById('btnLimpiarFiltros').onclick = ()=>{
-  filtrosTabla.forEach(f=> f.value = "");
-  renderTabla();
-};
 
 function contiene(campo, texto){ return (campo||"").toLowerCase().includes(texto.trim().toLowerCase()); }
 
@@ -1622,8 +1655,29 @@ function resetModal(){
 btnEliminar.onclick = async ()=>{
   if(editingId===null) return;
   if(confirm("¿Está seguro de eliminar este registro? Esta opción no tiene vuelta atrás.")){
-    await db.collection('movimientos').doc(editingId).delete();
-    cerrarModal();
+    try{
+      const ref = db.collection('movimientos').doc(editingId);
+      const snap = await ref.get();
+      const datos = snap.exists ? snap.data() : null;
+      if(datos && datos.saldaDeuda){
+        // este movimiento había saldado una deuda de otro registro: la revertimos a "Debe"
+        const { movId, idx } = datos.saldaDeuda;
+        const refDeuda = db.collection('movimientos').doc(movId);
+        const snapDeuda = await refDeuda.get();
+        if(snapDeuda.exists){
+          const md = snapDeuda.data();
+          const pagosDeuda = pagosDe(md).slice();
+          if(pagosDeuda[idx]){
+            pagosDeuda[idx] = {...pagosDeuda[idx], saldada:false, fechaSaldadoISO:null, fechaSaldadoDisplay:null, saldadoPorMovId:null};
+            await refDeuda.update({ pagos: pagosDeuda, tieneDeudaPendiente: tieneDeudaPendiente(pagosDeuda) });
+          }
+        }
+      }
+      await ref.delete();
+      cerrarModal();
+    }catch(e){
+      alert("No se pudo eliminar: " + e.message);
+    }
   }
 };
 
@@ -1734,6 +1788,7 @@ btnGuardarMov.onclick = async ()=>{
   const codigo = CODIGO_POR_CONCEPTO[selProfesional.value+"||"+selConcepto.value] || "";
   const pendienteDeuda = tieneDeudaPendiente(pagos);
 
+  let nuevoMovId = null;
   if(modo==='editar'){
     if(!confirm("¿Está seguro de editar este registro? Esta opción no tiene vuelta atrás.")) return;
     const cambios = {
@@ -1743,13 +1798,15 @@ btnGuardarMov.onclick = async ()=>{
       actualizadoEn: firebase.firestore.FieldValue.serverTimestamp(),
     };
     await db.collection('movimientos').doc(editingId).update(cambios);
+    nuevoMovId = editingId;
   } else {
-    await db.collection('movimientos').add({
+    const nuevoRef = await db.collection('movimientos').add({
       fechaISO, fechaDisplay, pac: pacValor, prof: selProfesional.value,
       concepto: selConcepto.value, codigo, notas: document.getElementById('inpNotas').value,
       moneda: monedaSel, valor: valorNum, pagos, tieneDeudaPendiente: pendienteDeuda,
       creadoPor: currentUser.nombre, creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
     });
+    nuevoMovId = nuevoRef.id;
   }
 
   if(radioSaldar){
@@ -1761,12 +1818,13 @@ btnGuardarMov.onclick = async ()=>{
       const md = snap.data();
       const pagosDeuda = pagosDe(md).slice();
       if(pagosDeuda[idx]){
-        pagosDeuda[idx] = {...pagosDeuda[idx], saldada:true, fechaSaldadoISO:fechaISO, fechaSaldadoDisplay:fechaDisplay};
+        pagosDeuda[idx] = {...pagosDeuda[idx], saldada:true, fechaSaldadoISO:fechaISO, fechaSaldadoDisplay:fechaDisplay, saldadoPorMovId:nuevoMovId};
         await ref.update({
           pagos: pagosDeuda, tieneDeudaPendiente: tieneDeudaPendiente(pagosDeuda),
-          // por compatibilidad con datos viejos que todavía miran estos campos sueltos:
-          saldada: !tieneDeudaPendiente(pagosDeuda) ? true : (md.saldada||false),
-          fechaSaldadoISO: pagosDeuda[idx].fechaSaldadoISO, fechaSaldadoDisplay: pagosDeuda[idx].fechaSaldadoDisplay,
+        });
+        // guardamos en el movimiento nuevo qué deuda saldó, para poder revertirla si este movimiento se borra
+        await db.collection('movimientos').doc(nuevoMovId).update({
+          saldaDeuda: {movId, idx},
         });
       }
     }
@@ -1834,7 +1892,7 @@ document.getElementById('generarReporteFecha').onclick = async ()=>{
     if(!filas.length){ alert("No hay movimientos cargados en esa fecha."); return; }
     const sesiones = snapCaja.docs.map(d=> d.data())
       .sort((a,b)=> (a.abiertaEn?.toMillis()||0) - (b.abiertaEn?.toMillis()||0));
-    generarPDFReporteDiario(filas, fechaISO, sesiones);
+    await generarPNGReporteDiario(filas, fechaISO, sesiones);
     overlayReporteFecha.classList.remove('show');
   }catch(e){
     alert("Error al generar el reporte: " + e.message);
@@ -1856,15 +1914,112 @@ const overlayPreviewPDF = document.getElementById('overlayPreviewPDF');
 let pdfListoParaDescargar = null;
 
 function mostrarPreviewPDF(doc, filename){
-  pdfListoParaDescargar = {doc, filename};
+  pdfListoParaDescargar = {tipo:'pdf', doc, filename};
+  document.getElementById('iframePreviewPDF').style.display = 'block';
+  document.getElementById('imgPreviewPNG').style.display = 'none';
   document.getElementById('iframePreviewPDF').src = doc.output('bloburl');
+  overlayPreviewPDF.classList.add('show');
+}
+function mostrarPreviewPNG(dataUrl, filename){
+  pdfListoParaDescargar = {tipo:'png', dataUrl, filename};
+  document.getElementById('imgPreviewPNG').style.display = 'block';
+  document.getElementById('iframePreviewPDF').style.display = 'none';
+  document.getElementById('imgPreviewPNG').src = dataUrl;
   overlayPreviewPDF.classList.add('show');
 }
 document.getElementById('closePreviewPDF').onclick = ()=> overlayPreviewPDF.classList.remove('show');
 document.getElementById('cancelPreviewPDF').onclick = ()=> overlayPreviewPDF.classList.remove('show');
 document.getElementById('descargarPreviewPDF').onclick = ()=>{
-  if(pdfListoParaDescargar) pdfListoParaDescargar.doc.save(pdfListoParaDescargar.filename);
+  if(!pdfListoParaDescargar) return;
+  if(pdfListoParaDescargar.tipo==='pdf'){
+    pdfListoParaDescargar.doc.save(pdfListoParaDescargar.filename);
+  } else {
+    const a = document.createElement('a');
+    a.href = pdfListoParaDescargar.dataUrl;
+    a.download = pdfListoParaDescargar.filename;
+    a.click();
+  }
 };
+
+function construirFilaVisual(m){
+  const esGasto = esEgreso(m.prof);
+  const totalClass = m.valor==0 ? '' : (esGasto?'egreso':'ingreso');
+  return `
+    <tr>
+      <td>${m.fechaDisplay}</td>
+      <td class="left">${m.pac}</td>
+      <td>${m.prof}</td>
+      <td class="codigo">${m.codigo||""}</td>
+      <td class="concepto" style="white-space:normal;">${m.concepto}</td>
+      <td class="notas" style="white-space:normal;overflow:visible;text-overflow:clip;max-width:220px;">${m.notas||""}</td>
+      <td class="total ${totalClass}">${fmtTotal(m)}</td>
+      <td class="badges-cell">${medioBadgesHTML(m)}</td>
+      <td class="badges-cell">${cobroBadgesHTML(m)}</td>
+    </tr>
+  `;
+}
+
+async function generarPNGReporteDiario(filas, fechaISO, sesiones){
+  const [y_, m_, d_] = fechaISO.split('-');
+  document.getElementById('rvFecha').textContent = `${d_}/${m_}/${y_}`;
+  document.getElementById('rvTbody').innerHTML = filas.map(construirFilaVisual).join('');
+
+  let inPesosEf=0, outPesosEf=0, inUsdEf=0, outUsdEf=0;
+  let inPesosMp=0, outPesosMp=0, inPesosTransf=0, outPesosTransf=0;
+  const pagosProfesionales = [];
+  filas.forEach(m=>{
+    const esGasto = esEgreso(m.prof);
+    if(/honorario/i.test(m.concepto||"")) pagosProfesionales.push(m);
+    pagosDe(m).forEach(p=>{
+      if(p.medio==="efectivo"){
+        if(m.moneda==="USD"){ esGasto ? outUsdEf+=p.valor : inUsdEf+=p.valor; }
+        else { esGasto ? outPesosEf+=p.valor : inPesosEf+=p.valor; }
+      } else if(p.medio==="mp" && m.moneda!=="USD"){
+        esGasto ? outPesosMp+=p.valor : inPesosMp+=p.valor;
+      } else if(p.medio==="transferencia" && m.moneda!=="USD"){
+        esGasto ? outPesosTransf+=p.valor : inPesosTransf+=p.valor;
+      }
+    });
+  });
+
+  const sesionApertura = sesiones[0];
+  const sesionesCerradas = sesiones.filter(s=>s.cerradaEn);
+  const sesionCierre = sesionesCerradas[sesionesCerradas.length-1];
+
+  document.getElementById('rvCaja').innerHTML = `
+    <div class="kpi-row" style="margin-bottom:0;">
+      <div class="kpi"><div class="lbl">Caja inicial</div><div class="val">${sesionApertura ? '$'+Number(sesionApertura.aperturaMonto).toLocaleString('es-AR') : 'Sin registro'}</div></div>
+      <div class="kpi"><div class="lbl">Movimientos efectivo (neto)</div><div class="val">$${(inPesosEf-outPesosEf).toLocaleString('es-AR')}${(inUsdEf||outUsdEf) ? ' / US$ '+(inUsdEf-outUsdEf).toLocaleString('es-AR') : ''}</div></div>
+      <div class="kpi"><div class="lbl">Caja final</div><div class="val">${sesionCierre ? '$'+Number(sesionCierre.montoContado).toLocaleString('es-AR') : 'Sin cierre'}</div></div>
+    </div>
+  `;
+
+  document.getElementById('rvPagosProf').innerHTML = pagosProfesionales.length
+    ? pagosProfesionales.map(m=>`
+        <div class="deuda-row">
+          <div class="deuda-info"><span class="nom">${m.pac}</span></div>
+          <span class="deuda-total" style="color:#2f7a2f;">${fmtTotal(m)}</span>
+        </div>
+      `).join('')
+    : `<div class="empty-state">No hubo retiros de honorarios este día.</div>`;
+
+  document.getElementById('rvIngresosEgresos').innerHTML = `
+    <table style="width:100%;">
+      <thead><tr><th class="left">Medio</th><th>Ingresos</th><th>Egresos</th></tr></thead>
+      <tbody>
+        <tr><td class="left">Efectivo $</td><td style="color:#2f7a2f;font-weight:700;">$${inPesosEf.toLocaleString('es-AR')}</td><td style="color:#a13a3a;font-weight:700;">$${outPesosEf.toLocaleString('es-AR')}</td></tr>
+        <tr><td class="left">Efectivo USD</td><td style="color:#2f7a2f;font-weight:700;">US$ ${inUsdEf.toLocaleString('es-AR')}</td><td style="color:#a13a3a;font-weight:700;">US$ ${outUsdEf.toLocaleString('es-AR')}</td></tr>
+        <tr><td class="left">Mercado Pago</td><td style="color:#2f7a2f;font-weight:700;">$${inPesosMp.toLocaleString('es-AR')}</td><td style="color:#a13a3a;font-weight:700;">$${outPesosMp.toLocaleString('es-AR')}</td></tr>
+        <tr><td class="left">Transferencia</td><td style="color:#2f7a2f;font-weight:700;">$${inPesosTransf.toLocaleString('es-AR')}</td><td style="color:#a13a3a;font-weight:700;">$${outPesosTransf.toLocaleString('es-AR')}</td></tr>
+      </tbody>
+    </table>
+  `;
+
+  const el = document.getElementById('reporteVisualHidden');
+  const canvas = await html2canvas(el, {scale:2, backgroundColor:'#f8f3e8', useCORS:true});
+  const dataUrl = canvas.toDataURL('image/png');
+  mostrarPreviewPNG(dataUrl, `reporte-dia-${fechaISO}.png`);
+}
 
 function generarPDFReporteDiario(filas, fechaISO, sesiones){
   const { jsPDF } = window.jspdf;
