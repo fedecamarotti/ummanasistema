@@ -408,6 +408,10 @@
     <h2>Apertura de caja</h2>
     <div class="modal-sub" id="aperturaSugeridaTxt"></div>
     <div class="field">
+      <label>Fecha de esta caja</label>
+      <input type="date" id="inpFechaApertura">
+    </div>
+    <div class="field">
       <label>Monto inicial en efectivo ($)</label>
       <input type="text" id="inpAperturaMonto" inputmode="numeric" placeholder="0">
     </div>
@@ -424,6 +428,10 @@
     <button class="close-x" id="closeCierre">✕</button>
     <h2>Cierre de caja</h2>
     <div class="modal-sub" id="cierreEsperadoTxt"></div>
+    <div class="field">
+      <label>Fecha de esta caja</label>
+      <input type="date" id="inpFechaCierre">
+    </div>
     <div class="field">
       <label>Monto real contado en caja ($)</label>
       <input type="text" id="inpCierreMonto" inputmode="numeric" placeholder="0">
@@ -1329,10 +1337,11 @@ function renderTabla(){
    CAJA: APERTURA / CIERRE
    ===================================================================== */
 
-async function calcularEsperadoCaja(){
+async function calcularEsperadoCaja(fechaOverride){
   if(!cajaActual) return 0;
+  const fecha = fechaOverride || cajaActual.fechaISO;
   let ingresos = 0, egresos = 0;
-  const snap = await db.collection('movimientos').where('fechaISO','==', cajaActual.fechaISO).get();
+  const snap = await db.collection('movimientos').where('fechaISO','==', fecha).get();
   snap.docs.forEach(d=>{
     const m = d.data();
     if(m.moneda !== "$") return;
@@ -1404,6 +1413,7 @@ const inpAperturaMonto = document.getElementById('inpAperturaMonto');
 function abrirModalApertura(){
   const sugerido = ultimoCierre !== null ? ultimoCierre : 0;
   inpAperturaMonto.value = sugerido.toLocaleString('es-AR');
+  document.getElementById('inpFechaApertura').value = hoyISO();
   document.getElementById('aperturaSugeridaTxt').textContent = ultimoCierre !== null
     ? `Sugerido según el último cierre: $${ultimoCierre.toLocaleString('es-AR')}`
     : "No hay un cierre anterior registrado — ingresá el monto real con el que arrancás.";
@@ -1418,8 +1428,10 @@ inpAperturaMonto.addEventListener('input', ()=>{
 document.getElementById('confirmarApertura').onclick = async ()=>{
   const monto = Number(inpAperturaMonto.value.replace(/\D/g,""));
   if(inpAperturaMonto.value==="" || isNaN(monto)){ alert("Ingresá un monto de apertura."); return; }
+  const fechaElegida = document.getElementById('inpFechaApertura').value;
+  if(!fechaElegida){ alert("Elegí una fecha para esta caja."); return; }
   await db.collection('cajaSesiones').add({
-    fechaISO: hoyISO(), recepcionista: currentUser.nombre,
+    fechaISO: fechaElegida, recepcionista: currentUser.nombre,
     aperturaMonto: monto, abiertaEn: firebase.firestore.FieldValue.serverTimestamp(),
     cerradaEn: null, montoContado: null, esperadoCierre: null, diferencia: null,
   });
@@ -1431,14 +1443,22 @@ const inpCierreMonto = document.getElementById('inpCierreMonto');
 
 async function abrirModalCierre(){
   document.getElementById('cierreEsperadoTxt').textContent = `Monto esperado en caja: calculando…`;
+  document.getElementById('inpFechaCierre').value = cajaActual.fechaISO;
   inpCierreMonto.value = "";
   document.getElementById('cierreWarning').classList.add('col-hidden');
   document.getElementById('confirmarCierre').textContent = "Cerrar caja";
   overlayCierre.classList.add('show');
-  const esperado = await calcularEsperadoCaja();
+  await recalcularEsperadoCierre();
+}
+async function recalcularEsperadoCierre(){
+  const fecha = document.getElementById('inpFechaCierre').value;
+  const esperado = await calcularEsperadoCaja(fecha);
   document.getElementById('cierreEsperadoTxt').textContent = `Monto esperado en caja: $${esperado.toLocaleString('es-AR')}`;
   inpCierreMonto.value = esperado.toLocaleString('es-AR');
+  document.getElementById('cierreWarning').classList.add('col-hidden');
+  document.getElementById('confirmarCierre').textContent = "Cerrar caja";
 }
+document.getElementById('inpFechaCierre').addEventListener('input', recalcularEsperadoCierre);
 document.getElementById('closeCierre').onclick = ()=> overlayCierre.classList.remove('show');
 document.getElementById('cancelCierre').onclick = ()=> overlayCierre.classList.remove('show');
 inpCierreMonto.addEventListener('input', ()=>{
@@ -1450,7 +1470,8 @@ inpCierreMonto.addEventListener('input', ()=>{
 document.getElementById('confirmarCierre').onclick = async ()=>{
   const contado = Number(inpCierreMonto.value.replace(/\D/g,""));
   if(inpCierreMonto.value==="" || isNaN(contado)){ alert("Ingresá el monto real contado en caja."); return; }
-  const esperado = await calcularEsperadoCaja();
+  const fechaCierre = document.getElementById('inpFechaCierre').value || cajaActual.fechaISO;
+  const esperado = await calcularEsperadoCaja(fechaCierre);
   const diferencia = contado - esperado;
   const warn = document.getElementById('cierreWarning');
 
@@ -1464,6 +1485,7 @@ document.getElementById('confirmarCierre').onclick = async ()=>{
   }
 
   await db.collection('cajaSesiones').doc(cajaActual.id).update({
+    fechaISO: fechaCierre,
     cerradaEn: firebase.firestore.FieldValue.serverTimestamp(),
     montoContado: contado, esperadoCierre: esperado, diferencia,
   });
