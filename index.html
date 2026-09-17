@@ -592,6 +592,30 @@
   </div>
 </div>
 
+<!-- ============ CONTENEDOR OCULTO PARA "CALCULAR PAGO PROFESIONAL" COMO IMAGEN ============ -->
+<div id="pagoVisualHidden" style="position:fixed;left:-99999px;top:0;width:1400px;background:#f8f3e8;padding:28px;font-family:'Montserrat',sans-serif;">
+  <div style="margin-bottom:18px;">
+    <div style="font-size:20px;font-weight:700;color:#24262b;">Pago a profesional: <span id="pvProfesional"></span></div>
+    <div style="font-size:12px;color:#9c9179;margin-top:2px;">CAJA UMMANA — <span id="pvFecha"></span></div>
+  </div>
+  <div class="sheet-wrap" style="margin:0;">
+    <table style="width:100%;">
+      <thead>
+        <tr>
+          <th>Fecha</th><th class="left">Paciente/Alumno</th><th>Profesional</th><th>Código</th>
+          <th>Concepto</th><th>Notas/Detalle</th><th>Total</th><th>Medio de pago</th><th>Cobró</th>
+        </tr>
+      </thead>
+      <tbody id="pvTbody"></tbody>
+    </table>
+  </div>
+
+  <div style="margin-top:24px;">
+    <div class="rv-section-title">Resumen</div>
+    <div id="pvResumen"></div>
+  </div>
+</div>
+
 <!-- ============ MODAL: FECHA DEL REPORTE DIARIO ============ -->
 <div class="overlay" id="overlayReporteFecha">
   <div class="modal">
@@ -1305,10 +1329,12 @@ function renderTabla(){
    CAJA: APERTURA / CIERRE
    ===================================================================== */
 
-function calcularEsperadoCaja(){
+async function calcularEsperadoCaja(){
   if(!cajaActual) return 0;
   let ingresos = 0, egresos = 0;
-  movimientosHoy.forEach(m=>{
+  const snap = await db.collection('movimientos').where('fechaISO','==', cajaActual.fechaISO).get();
+  snap.docs.forEach(d=>{
+    const m = d.data();
     if(m.moneda !== "$") return;
     const esGasto = esEgreso(m.prof, m.concepto);
     pagosDe(m).filter(p=>p.medio==="efectivo").forEach(p=>{
@@ -1403,13 +1429,15 @@ document.getElementById('confirmarApertura').onclick = async ()=>{
 const overlayCierre = document.getElementById('overlayCierre');
 const inpCierreMonto = document.getElementById('inpCierreMonto');
 
-function abrirModalCierre(){
-  const esperado = calcularEsperadoCaja();
-  document.getElementById('cierreEsperadoTxt').textContent = `Monto esperado en caja: $${esperado.toLocaleString('es-AR')}`;
-  inpCierreMonto.value = esperado.toLocaleString('es-AR');
+async function abrirModalCierre(){
+  document.getElementById('cierreEsperadoTxt').textContent = `Monto esperado en caja: calculando…`;
+  inpCierreMonto.value = "";
   document.getElementById('cierreWarning').classList.add('col-hidden');
   document.getElementById('confirmarCierre').textContent = "Cerrar caja";
   overlayCierre.classList.add('show');
+  const esperado = await calcularEsperadoCaja();
+  document.getElementById('cierreEsperadoTxt').textContent = `Monto esperado en caja: $${esperado.toLocaleString('es-AR')}`;
+  inpCierreMonto.value = esperado.toLocaleString('es-AR');
 }
 document.getElementById('closeCierre').onclick = ()=> overlayCierre.classList.remove('show');
 document.getElementById('cancelCierre').onclick = ()=> overlayCierre.classList.remove('show');
@@ -1422,7 +1450,7 @@ inpCierreMonto.addEventListener('input', ()=>{
 document.getElementById('confirmarCierre').onclick = async ()=>{
   const contado = Number(inpCierreMonto.value.replace(/\D/g,""));
   if(inpCierreMonto.value==="" || isNaN(contado)){ alert("Ingresá el monto real contado en caja."); return; }
-  const esperado = calcularEsperadoCaja();
+  const esperado = await calcularEsperadoCaja();
   const diferencia = contado - esperado;
   const warn = document.getElementById('cierreWarning');
 
@@ -1976,6 +2004,8 @@ async function generarPNGReporteDiario(filas, fechaISO, sesiones){
     const esGasto = esEgreso(m.prof, m.concepto);
     if(/honorario/i.test(m.concepto||"")) pagosProfesionales.push(m);
     pagosDe(m).forEach(p=>{
+      // Igual que en "Cerrar caja": si lo cobró el profesional directo, esa plata nunca entró a nuestra caja física.
+      if(!esGasto && p.cobradoPor === "profesional") return;
       if(p.medio==="efectivo"){
         if(m.moneda==="USD"){ esGasto ? outUsdEf+=p.valor : inUsdEf+=p.valor; }
         else { esGasto ? outPesosEf+=p.valor : inPesosEf+=p.valor; }
@@ -1988,14 +2018,16 @@ async function generarPNGReporteDiario(filas, fechaISO, sesiones){
   });
 
   const sesionApertura = sesiones[0];
-  const sesionesCerradas = sesiones.filter(s=>s.cerradaEn);
-  const sesionCierre = sesionesCerradas[sesionesCerradas.length-1];
+  const netoPesosEf = inPesosEf - outPesosEf;
+  const cajaFinalTxt = sesionApertura
+    ? `$${(Number(sesionApertura.aperturaMonto)+netoPesosEf).toLocaleString('es-AR')}`
+    : 'Sin registro de apertura';
 
   document.getElementById('rvCaja').innerHTML = `
     <div class="kpi-row" style="margin-bottom:0;">
       <div class="kpi"><div class="lbl">Caja inicial</div><div class="val">${sesionApertura ? '$'+Number(sesionApertura.aperturaMonto).toLocaleString('es-AR') : 'Sin registro'}</div></div>
-      <div class="kpi"><div class="lbl">Movimientos efectivo (neto)</div><div class="val">$${(inPesosEf-outPesosEf).toLocaleString('es-AR')}${(inUsdEf||outUsdEf) ? ' / US$ '+(inUsdEf-outUsdEf).toLocaleString('es-AR') : ''}</div></div>
-      <div class="kpi"><div class="lbl">Caja final</div><div class="val">${sesionCierre ? '$'+Number(sesionCierre.montoContado).toLocaleString('es-AR') : 'Sin cierre'}</div></div>
+      <div class="kpi"><div class="lbl">Movimientos efectivo (neto)</div><div class="val">$${netoPesosEf.toLocaleString('es-AR')}${(inUsdEf||outUsdEf) ? ' / US$ '+(inUsdEf-outUsdEf).toLocaleString('es-AR') : ''}</div></div>
+      <div class="kpi"><div class="lbl">Caja final</div><div class="val">${cajaFinalTxt}</div></div>
     </div>
   `;
 
@@ -2223,47 +2255,42 @@ async function refreshPagoPreview(){
 selProfesionalPago.addEventListener('input', refreshPagoPreview);
 inpFechaPago.addEventListener('input', refreshPagoPreview);
 
-document.getElementById('btnExportarPago').onclick = ()=>{
+document.getElementById('btnExportarPago').onclick = async ()=>{
   const prof = selProfesionalPago.value;
   const fechaISO = inpFechaPago.value;
   if(!pagoMovsActuales.length) return;
+  await generarPNGPagoProfesional(prof, fechaISO, pagoMovsActuales);
+};
 
-  const lineas = [];
-  pagoMovsActuales.forEach(m=>{
-    pagosDe(m).forEach(p=> lineas.push({pac:m.pac, concepto:m.concepto, notas:m.notas, moneda:m.moneda, valor:p.valor, cobradoPor:p.cobradoPor||'ummana'}));
-  });
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({orientation:'landscape', unit:'pt', format:'a4'});
-  doc.setFont('helvetica','bold'); doc.setFontSize(14);
-  doc.text(`CAJA UMMANA - Pago a profesional: ${limpiarTextoPDF(prof)}`, 40, 40);
-  doc.setFont('helvetica','normal'); doc.setFontSize(10);
-  const [y_,m_,d_] = fechaISO.split('-');
-  doc.text(`${d_}/${m_}/${y_}`, 40, 58);
-
-  const body = lineas.map(l=>[l.pac, l.concepto, l.notas||"", fmtMonto(l.valor, l.moneda), l.cobradoPor==='profesional' ? "Cobró el profesional" : "Cobró Ummana"].map(limpiarTextoPDF));
-  doc.autoTable({
-    startY: 72, head: [["Paciente/Alumno","Concepto","Notas","Monto","¿Quién cobró?"]], body,
-    styles:{font:'helvetica', fontSize:9, cellPadding:5}, headStyles:{fillColor:[111,106,248], textColor:255},
-    alternateRowStyles:{fillColor:[247,247,250]},
-  });
+async function generarPNGPagoProfesional(prof, fechaISO, movs){
+  const [y_, m_, d_] = fechaISO.split('-');
+  document.getElementById('pvProfesional').textContent = prof;
+  document.getElementById('pvFecha').textContent = `${d_}/${m_}/${y_}`;
+  document.getElementById('pvTbody').innerHTML = movs.map(construirFilaVisual).join('');
 
   let totalPesos=0, totalUsd=0, profPesos=0, profUsd=0, ummPesos=0, ummUsd=0;
-  lineas.forEach(l=>{
-    const esUsd = l.moneda==="USD";
-    if(esUsd) totalUsd+=l.valor; else totalPesos+=l.valor;
-    if(l.cobradoPor==="profesional"){ esUsd ? profUsd+=l.valor : profPesos+=l.valor; }
-    else { esUsd ? ummUsd+=l.valor : ummPesos+=l.valor; }
+  movs.forEach(m=>{
+    pagosDe(m).forEach(p=>{
+      const esUsd = m.moneda==="USD";
+      if(esUsd) totalUsd+=p.valor; else totalPesos+=p.valor;
+      if(p.cobradoPor==="profesional"){ esUsd ? profUsd+=p.valor : profPesos+=p.valor; }
+      else { esUsd ? ummUsd+=p.valor : ummPesos+=p.valor; }
+    });
   });
 
-  let y = doc.lastAutoTable.finalY + 24;
-  doc.setFontSize(10);
-  if(totalPesos || totalUsd){ doc.text(`Total del día: $ ${totalPesos.toLocaleString('es-AR')}   ·   US$ ${totalUsd.toLocaleString('es-AR')}`, 40, y); y+=16; }
-  if(profPesos || profUsd){ doc.text(`Cobrado por el profesional: $ ${profPesos.toLocaleString('es-AR')}   ·   US$ ${profUsd.toLocaleString('es-AR')}`, 40, y); y+=16; }
-  doc.setFont('helvetica','bold'); doc.setFontSize(12);
-  doc.text(`A pagar (cobrado por Ummana): $ ${ummPesos.toLocaleString('es-AR')}   ·   US$ ${ummUsd.toLocaleString('es-AR')}`, 40, y);
-  mostrarPreviewPDF(doc, `pago-${prof.replace(/[^a-z0-9]+/gi,'-')}-${fechaISO}.pdf`);
-};
+  document.getElementById('pvResumen').innerHTML = `
+    <div class="kpi-row" style="margin-bottom:0;">
+      <div class="kpi"><div class="lbl">Total del día</div><div class="val">$${totalPesos.toLocaleString('es-AR')}${totalUsd?' / US$ '+totalUsd.toLocaleString('es-AR'):''}</div></div>
+      <div class="kpi"><div class="lbl">Cobrado por el profesional</div><div class="val">$${profPesos.toLocaleString('es-AR')}${profUsd?' / US$ '+profUsd.toLocaleString('es-AR'):''}</div></div>
+      <div class="kpi"><div class="lbl">A pagar (cobrado por Ummana)</div><div class="val" style="color:#2f7a2f;">$${ummPesos.toLocaleString('es-AR')}${ummUsd?' / US$ '+ummUsd.toLocaleString('es-AR'):''}</div></div>
+    </div>
+  `;
+
+  const el = document.getElementById('pagoVisualHidden');
+  const canvas = await html2canvas(el, {scale:2, backgroundColor:'#f8f3e8', useCORS:true});
+  const dataUrl = canvas.toDataURL('image/png');
+  mostrarPreviewPNG(dataUrl, `pago-${prof.replace(/[^a-z0-9]+/gi,'-')}-${fechaISO}.png`);
+}
 
 /* =====================================================================
    INFORMES (admin) — rango de fechas + filtro por profesional
