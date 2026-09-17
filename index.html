@@ -1528,7 +1528,7 @@ function ordenarConceptos(profesional, opts){
 
 let conceptosDisponiblesActual = [];
 
-function actualizarConceptosDesdeProfesional(){
+function actualizarSoloConceptos(){
   const opts = CONCEPTOS[selProfesional.value] || [];
   if(opts.length){
     selConcepto.disabled = false;
@@ -1540,6 +1540,9 @@ function actualizarConceptosDesdeProfesional(){
     selConcepto.placeholder = "Sin conceptos configurados";
     conceptosDisponiblesActual = [];
   }
+}
+function actualizarConceptosDesdeProfesional(){
+  actualizarSoloConceptos();
   actualizarCampoPacienteSegunTipo();
 }
 attachAutocomplete(selConcepto, ()=> conceptosDisponiblesActual.map(c=>c.concepto));
@@ -1726,7 +1729,7 @@ document.getElementById('deudasPacienteLista').addEventListener('change', (e)=>{
   const deuda = movimientosDeuda.find(d=> d.movId===movId && d.idx===Number(idxStr));
   if(!deuda) return;
   selProfesional.value = deuda.prof;
-  actualizarConceptosDesdeProfesional();
+  actualizarSoloConceptos();
   selConcepto.disabled = false;
   selConcepto.value = `Salda deuda del ${deuda.fechaDisplay}`;
 });
