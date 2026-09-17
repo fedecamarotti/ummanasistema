@@ -20,35 +20,36 @@
 
 <style>
   :root{
-    --border: #e7e7ea;
+    --border: #e6dbc2;
     --text: #24262b;
-    --muted: #8a8d94;
+    --muted: #9c9179;
     --accent: #6f6af8;
     --accent-dk: #5650d6;
   }
   *{box-sizing:border-box; font-family:'Montserrat', sans-serif;}
-  body{margin:0;background:#f4f5f7;color:var(--text);font-size:12px;}
+  body{margin:0;background:#f8f3e8;color:var(--text);font-size:12px;}
   .col-hidden{display:none !important;}
   button{font-family:inherit;cursor:pointer;}
 
   /* ---------- Login ---------- */
   #loginScreen{
     min-height:100vh;display:flex;align-items:center;justify-content:center;
-    background:linear-gradient(135deg,#f4f5f7,#ecebff);
+    background:linear-gradient(135deg,#f8f3e8,#efe3c4);
   }
   .login-card{
-    background:#fff;border:1px solid var(--border);border-radius:16px;
+    background:#fffcf5;border:1px solid var(--border);border-radius:16px;
     padding:36px 34px;width:100%;max-width:360px;box-shadow:0 12px 40px rgba(20,20,30,0.08);
   }
   .login-card h1{font-size:18px;margin:0 0 4px;font-weight:700;}
-  .login-card .sub{font-size:12px;color:var(--muted);margin-bottom:22px;}
+  .login-logo{height:40px;display:block;margin:0 auto 10px;}
+  .login-card .sub{font-size:12px;color:var(--muted);margin-bottom:22px;text-align:center;}
   .login-card .field{margin-bottom:14px;}
   .login-card label{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.3px;}
   .login-card input{
     width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;
-    font-size:13px;font-family:inherit;background:#fcfcfd;
+    font-size:13px;font-family:inherit;background:#fdfbf2;
   }
-  .login-card input:focus{outline:none;border-color:var(--accent);background:#fff;}
+  .login-card input:focus{outline:none;border-color:var(--accent);background:#fffcf5;}
   .login-card .btn-primary{width:100%;padding:11px;margin-top:6px;font-size:13px;}
   .login-error{
     background:#fdeeee;border:1px solid #f3d3d3;color:#a13a3a;font-size:11.5px;
@@ -57,10 +58,11 @@
 
   /* ---------- Top bar ---------- */
   .topbar{
-    background:#fff;border-bottom:1px solid var(--border);padding:16px 28px;
+    background:#fffcf5;border-bottom:1px solid var(--border);padding:16px 28px;
     display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
   }
   .topbar h1{font-size:16px;margin:0;font-weight:700;letter-spacing:0.2px;}
+  .topbar-logo{height:34px;display:block;}
   .topbar .sub{font-size:11.5px;color:var(--muted);margin-top:2px;font-weight:500;}
   .caja-status{
     display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;
@@ -73,31 +75,31 @@
 
   .layout{display:flex;align-items:flex-start;}
   .sidebar{
-    width:230px;flex:none;background:#fff;border-right:1px solid var(--border);
+    width:230px;flex:none;background:#fffcf5;border-right:1px solid var(--border);
     padding:16px 10px;transition:width 0.18s ease, padding 0.18s ease;overflow:hidden;
     min-height:calc(100vh - 65px);
   }
   .sidebar.collapsed{width:44px;padding:16px 6px;}
   .sidebar.collapsed .sidebar-links button{display:none;}
   .sidebar-toggle{
-    border:none;background:#f4f4f6;width:32px;height:32px;border-radius:8px;
+    border:none;background:#f0e8cf;width:32px;height:32px;border-radius:8px;
     font-size:14px;margin-bottom:14px;color:var(--text);
   }
-  .sidebar-toggle:hover{background:#eaeaee;}
+  .sidebar-toggle:hover{background:#e6dcc0;}
   .sidebar-links{display:flex;flex-direction:column;gap:4px;}
   .sidebar-links button{
     text-align:left;width:100%;white-space:nowrap;border:none;background:transparent;
     padding:10px 12px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--text);
   }
-  .sidebar-links button:hover{background:#f4f4f6;}
+  .sidebar-links button:hover{background:#f0e8cf;}
   .sidebar-links .btn-deudores{background:transparent;position:relative;}
   .side-icon{display:inline-block;width:18px;text-align:center;}
   .main-area{flex:1;min-width:0;}
   .btn{
-    border:1px solid var(--border);background:#fff;padding:8px 16px;border-radius:7px;
+    border:1px solid var(--border);background:#fffcf5;padding:8px 16px;border-radius:7px;
     font-size:12.5px;font-weight:600;color:var(--text);
   }
-  .btn:hover{background:#f4f4f6;}
+  .btn:hover{background:#f0e8cf;}
   .btn:disabled{opacity:0.45;cursor:not-allowed;}
   .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent);}
   .btn-primary:hover{background:var(--accent-dk);}
@@ -109,14 +111,14 @@
 
   /* ---------- Sheet wrapper ---------- */
   .sheet-wrap{
-    margin:22px 28px 40px;background:#fff;border:1px solid var(--border);border-radius:12px;
+    margin:22px 28px 40px;background:#fffcf5;border:1px solid var(--border);border-radius:12px;
     overflow:auto;box-shadow:0 1px 3px rgba(20,20,30,0.04);
   }
-  table{border-collapse:collapse;width:100%;font-size:10.5px;min-width:900px;}
+  table{border-collapse:collapse;font-size:10.5px;}
   th,td{border-bottom:1px solid var(--border);padding:3px 9px;text-align:center;white-space:nowrap;line-height:1.2;}
   td.left, th.left{text-align:left;}
   thead th{
-    background:#fafafa;font-weight:700;font-size:9.5px;text-transform:uppercase;letter-spacing:0.4px;
+    background:#f4eeda;font-weight:700;font-size:9.5px;text-transform:uppercase;letter-spacing:0.4px;
     color:var(--muted);padding:0;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2;
   }
   .th-search{
@@ -124,15 +126,15 @@
     font-family:inherit;font-weight:700;font-size:9.5px;text-transform:uppercase;letter-spacing:0.4px;
     color:var(--muted);text-align:center;padding:9px 8px;
   }
-  .th-search::placeholder{color:#c2c4ca;text-transform:uppercase;letter-spacing:0.4px;font-weight:700;font-size:9.5px;}
-  .th-search:focus{background:#fff;color:var(--text);}
+  .th-search::placeholder{color:#b3a98e;text-transform:uppercase;letter-spacing:0.4px;font-weight:700;font-size:9.5px;}
+  .th-search:focus{background:#fffcf5;color:var(--text);}
   .th-search-left{text-align:left;}
   .editcol{width:34px;padding:0;}
   .editbtn{border:none;background:transparent;font-size:13px;padding:6px;color:#b5b7bd;border-radius:6px;}
-  .editbtn:hover{background:#f0f0f3;color:var(--accent);}
+  .editbtn:hover{background:#efe5cc;color:var(--accent);}
   td.concepto{white-space:nowrap;font-size:10.5px;line-height:1.2;}
   td.codigo{color:var(--muted);font-size:10.5px;}
-  td.notas{color:#5b5e66;font-size:10.5px;max-width:180px;white-space:normal;}
+  td.notas{color:#5b5e66;font-size:10.5px;width:200px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:default;}
   td.total{font-size:10.5px;}
   td.total.ingreso, td.total.egreso{font-weight:700;}
   td.total.ingreso{background:#e3f1de;color:#2f7a2f;}
@@ -145,7 +147,7 @@
   .badge-transferencia{background:#dde3fb;color:#3d4ec2;}
   .badge-tarjeta{background:#ece2fb;color:#7a3fc9;}
   .badge-debe{background:#fbdada;color:#c62828;}
-  .badge-saldado{background:#e7e7ea;color:#5f6368;}
+  .badge-saldado{background:#e6dbc2;color:#7a7159;}
 
   .hint{font-size:11.5px;color:var(--muted);padding:0 28px;font-weight:500;}
 
@@ -156,7 +158,7 @@
   }
   .overlay.show{display:flex;}
   .modal{
-    background:#fff;border-radius:14px;max-width:520px;width:100%;
+    background:#fffcf5;border-radius:14px;max-width:520px;width:100%;
     padding:24px 26px 22px;box-shadow:0 12px 40px rgba(0,0,0,0.22);position:relative;
   }
   .modal.wide{max-width:640px;}
@@ -164,29 +166,29 @@
   .modal .modal-sub{font-size:11.5px;color:var(--muted);margin-bottom:18px;font-weight:500;}
   .field{margin-bottom:14px;}
   .field label{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.3px;}
-  .field label .opt{font-weight:500;color:#c2c4ca;text-transform:none;letter-spacing:0;}
+  .field label .opt{font-weight:500;color:#b3a98e;text-transform:none;letter-spacing:0;}
   select, input[type=text], input[type=number], input[type=tel], input[type=email], input[type=date], input[type=password]{
     width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;
-    font-size:12.5px;font-family:inherit;color:var(--text);background:#fcfcfd;
+    font-size:12.5px;font-family:inherit;color:var(--text);background:#fdfbf2;
   }
-  select:focus, input:focus{outline:none;border-color:var(--accent);background:#fff;}
+  select:focus, input:focus{outline:none;border-color:var(--accent);background:#fffcf5;}
   .row2{display:flex;gap:10px;}
   .row2 > div{flex:1;}
   .combo{display:flex;gap:6px;}
   .combo select{flex:1;}
   .addbtn{
-    width:36px;flex:none;border:1px solid var(--accent);color:var(--accent);background:#fff;
+    width:36px;flex:none;border:1px solid var(--accent);color:var(--accent);background:#fffcf5;
     border-radius:8px;font-size:16px;line-height:1;font-weight:700;
   }
   .addbtn:hover{background:#eef1ff;}
   .currency-toggle{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;width:fit-content;}
-  .currency-toggle button{border:none;background:#fcfcfd;padding:8px 18px;font-size:12.5px;font-weight:600;}
+  .currency-toggle button{border:none;background:#fdfbf2;padding:8px 18px;font-size:12.5px;font-weight:600;}
   .currency-toggle button.active{background:var(--accent);color:#fff;}
   .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;border-top:1px solid var(--border);padding-top:14px;}
   .modal-actions.between{justify-content:space-between;}
-  .btn-eliminar{background:#fff;color:#c62828;border:1px solid #f3d3d3;}
+  .btn-eliminar{background:#fffcf5;color:#c62828;border:1px solid #f3d3d3;}
   .btn-eliminar:hover{background:#fdeeee;}
-  .subcard{border:1px dashed var(--border);border-radius:10px;padding:14px;margin-top:8px;background:#fafafc;}
+  .subcard{border:1px dashed var(--border);border-radius:10px;padding:14px;margin-top:8px;background:#f6f0de;}
   .subcard h3{margin:0 0 10px;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;}
   .close-x{position:absolute;top:16px;right:18px;border:none;background:none;font-size:16px;color:var(--muted);cursor:pointer;}
 
@@ -206,18 +208,18 @@
 
   .ac-wrap{position:relative;}
   .ac-dropdown{
-    position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;
+    position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fffcf5;
     border:1px solid var(--border);border-radius:8px;box-shadow:0 10px 26px rgba(20,20,30,0.14);
     max-height:220px;overflow-y:auto;z-index:80;display:none;
   }
   .ac-dropdown.show{display:block;}
   .ac-option{padding:8px 12px;font-size:12px;cursor:pointer;}
-  .ac-option:hover, .ac-option.activo{background:#f1f1f8;}
+  .ac-option:hover, .ac-option.activo{background:#f0e7cd;}
   .ac-empty{padding:8px 12px;font-size:11px;color:var(--muted);}
   .combo .ac-wrap{flex:1;}
 
   .kpi-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
-  .kpi{background:#fafafc;border:1px solid var(--border);border-radius:10px;padding:12px 16px;min-width:150px;}
+  .kpi{background:#f6f0de;border:1px solid var(--border);border-radius:10px;padding:12px 16px;min-width:150px;}
   .kpi .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;font-weight:700;}
   .kpi .val{font-size:16px;font-weight:700;margin-top:4px;}
 
@@ -225,10 +227,10 @@
     display:flex;align-items:center;gap:10px;margin:14px 28px 0;
   }
   .mes-selector button{
-    border:1px solid var(--border);background:#fff;border-radius:7px;width:30px;height:30px;
+    border:1px solid var(--border);background:#fffcf5;border-radius:7px;width:30px;height:30px;
     font-size:13px;font-weight:700;color:var(--text);
   }
-  .mes-selector button:hover{background:#f4f4f6;}
+  .mes-selector button:hover{background:#f0e8cf;}
   .mes-selector button:disabled{opacity:0.35;cursor:not-allowed;}
   .mes-selector span{font-size:13px;font-weight:700;text-transform:capitalize;min-width:150px;text-align:center;}
 
@@ -240,7 +242,7 @@
   }
   .panel-gate.show{display:flex;}
   .gate-card{
-    background:#fff;border:1px solid var(--border);border-radius:16px;padding:30px 34px;
+    background:#fffcf5;border:1px solid var(--border);border-radius:16px;padding:30px 34px;
     text-align:center;box-shadow:0 16px 46px rgba(20,20,30,0.16);max-width:320px;
   }
   .gate-card h2{margin:0 0 8px;font-size:16px;font-weight:700;}
@@ -264,7 +266,7 @@
   }
   .fila-editable .btn-guardar-fila:hover{background:var(--accent-dk);}
   .fila-editable .btn-eliminar-fila{
-    flex:0 0 auto;width:28px;height:28px;border:1px solid #f3d3d3;background:#fff;
+    flex:0 0 auto;width:28px;height:28px;border:1px solid #f3d3d3;background:#fffcf5;
     color:#c62828;border-radius:7px;font-size:12px;font-weight:700;
   }
   .fila-editable .btn-eliminar-fila:hover{background:#fdeeee;}
@@ -277,7 +279,7 @@
   .pago-row .pago-quien{flex:1.3;min-width:0;font-size:10.5px;}
   #pagosLista.oculta-quien .pago-quien{display:none;}
   .pago-row .btn-quitar{
-    flex:none;width:32px;height:34px;border:1px solid var(--border);background:#fff;
+    flex:none;width:32px;height:34px;border:1px solid var(--border);background:#fffcf5;
     border-radius:8px;color:#c62828;font-size:14px;
   }
   .pago-row .btn-quitar:hover{background:#fdeeee;}
@@ -302,7 +304,7 @@
 <!-- ============ LOGIN ============ -->
 <div id="loginScreen">
   <div class="login-card">
-    <h1>CAJA UMMANA</h1>
+    <img src="images/logo.png" alt="Ummana" class="login-logo">
     <div class="sub">Ingresá con tu usuario para continuar</div>
     <div class="login-error col-hidden" id="loginError"></div>
     <div class="field">
@@ -322,8 +324,7 @@
 
 <div class="topbar">
   <div>
-    <h1>CAJA UMMANA</h1>
-    <div class="sub" id="fechaHoy"></div>
+    <img src="images/logo.png" alt="Ummana" class="topbar-logo">
   </div>
   <div class="caja-status col-hidden" id="cajaStatus">
     <div class="dot"></div>
@@ -569,7 +570,20 @@
     </div>
     <div class="modal-actions">
       <button class="btn" id="cancelReporteFecha">Cancelar</button>
-      <button class="btn btn-primary" id="generarReporteFecha">Generar PDF</button>
+      <button class="btn btn-primary" id="generarReporteFecha">Ver vista previa</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: VISTA PREVIA DE PDF ============ -->
+<div class="overlay" id="overlayPreviewPDF">
+  <div class="modal" style="max-width:920px;">
+    <button class="close-x" id="closePreviewPDF">✕</button>
+    <h2>Vista previa</h2>
+    <iframe id="iframePreviewPDF" style="width:100%;height:72vh;border:1px solid var(--border);border-radius:8px;margin-top:8px;"></iframe>
+    <div class="modal-actions">
+      <button class="btn" id="cancelPreviewPDF">Cerrar</button>
+      <button class="btn btn-primary" id="descargarPreviewPDF">Descargar PDF</button>
     </div>
   </div>
 </div>
@@ -609,7 +623,7 @@
     <div id="pagoPreview"></div>
     <div class="modal-actions">
       <button class="btn" id="cancelPago">Cerrar</button>
-      <button class="btn btn-primary" id="btnExportarPago" disabled>Exportar PDF</button>
+      <button class="btn btn-primary" id="btnExportarPago" disabled>Ver vista previa</button>
     </div>
   </div>
 </div>
@@ -1244,7 +1258,7 @@ function renderTabla(){
       <td>${m.prof}</td>
       <td class="codigo">${m.codigo||""}</td>
       <td class="concepto">${m.concepto}</td>
-      <td class="notas">${m.notas||""}</td>
+      <td class="notas" title="${(m.notas||"").replace(/"/g,'&quot;')}">${m.notas||""}</td>
       <td class="total ${m.valor==0 ? '' : (esGasto?'egreso':'ingreso')}">${fmtTotal(m)}</td>
       <td class="badges-cell">${medioBadgesHTML(m)}</td>
       <td class="concepto">${cobroBadgesHTML(m)}</td>
@@ -1257,7 +1271,6 @@ function renderTabla(){
 /* =====================================================================
    CAJA: APERTURA / CIERRE
    ===================================================================== */
-document.getElementById('fechaHoy').textContent = new Date().toLocaleDateString('es-AR',{weekday:'long', day:'numeric', month:'long'});
 
 function calcularEsperadoCaja(){
   if(!cajaActual) return 0;
@@ -1814,7 +1827,7 @@ document.getElementById('generarReporteFecha').onclick = async ()=>{
   btn.disabled = true; btn.textContent = "Generando…";
   try{
     const [snapMov, snapCaja] = await Promise.all([
-      db.collection('movimientos').where('fechaISO','==', fechaISO).get(),
+      db.collection('movimientos').where('fechaISO','==', fechaISO).orderBy('creadoEn','asc').get(),
       db.collection('cajaSesiones').where('fechaISO','==', fechaISO).get(),
     ]);
     const filas = snapMov.docs.map(d=>({id:d.id, ...d.data()}));
@@ -1826,7 +1839,7 @@ document.getElementById('generarReporteFecha').onclick = async ()=>{
   }catch(e){
     alert("Error al generar el reporte: " + e.message);
   }
-  btn.disabled = false; btn.textContent = "Generar PDF";
+  btn.disabled = false; btn.textContent = "Ver vista previa";
 };
 
 function limpiarTextoPDF(str){
@@ -1839,6 +1852,20 @@ function limpiarTextoPDF(str){
     .replace(/[^\x20-\x7EáéíóúÁÉÍÓÚñÑüÜ¿¡®°]/g, '');      // cualquier otro carácter no soportado, se descarta
 }
 
+const overlayPreviewPDF = document.getElementById('overlayPreviewPDF');
+let pdfListoParaDescargar = null;
+
+function mostrarPreviewPDF(doc, filename){
+  pdfListoParaDescargar = {doc, filename};
+  document.getElementById('iframePreviewPDF').src = doc.output('bloburl');
+  overlayPreviewPDF.classList.add('show');
+}
+document.getElementById('closePreviewPDF').onclick = ()=> overlayPreviewPDF.classList.remove('show');
+document.getElementById('cancelPreviewPDF').onclick = ()=> overlayPreviewPDF.classList.remove('show');
+document.getElementById('descargarPreviewPDF').onclick = ()=>{
+  if(pdfListoParaDescargar) pdfListoParaDescargar.doc.save(pdfListoParaDescargar.filename);
+};
+
 function generarPDFReporteDiario(filas, fechaISO, sesiones){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({orientation:'landscape', unit:'pt', format:'a4'});
@@ -1849,11 +1876,11 @@ function generarPDFReporteDiario(filas, fechaISO, sesiones){
   const ROJO_BG = [251,234,234], ROJO_TXT = [161,58,58];
 
   // ---------- Encabezado ----------
-  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(...TEXTO);
-  doc.text('CAJA UMMANA', 40, 34);
   const [y_, m_, d_] = fechaISO.split('-');
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(...TEXTO);
+  doc.text(`Reporte dia ${d_}/${m_}/${y_}`, 40, 34);
   doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor(...GRIS);
-  doc.text(`Reporte diario — ${d_}/${m_}/${y_}`, 40, 50);
+  doc.text('CAJA UMMANA', 40, 50);
 
   // ---------- Tabla principal (mismo orden y columnas que la pantalla) ----------
   const body = filas.map(m=>[
@@ -1962,7 +1989,7 @@ function generarPDFReporteDiario(filas, fechaISO, sesiones){
     columnStyles:{1:{textColor:VERDE_TXT, fontStyle:'bold'}, 2:{textColor:ROJO_TXT, fontStyle:'bold'}},
   });
 
-  doc.save(`reporte-diario-${fechaISO}.pdf`);
+  mostrarPreviewPDF(doc, `reporte-dia-${d_}-${m_}-${y_}.pdf`);
 }
 
 /* =====================================================================
@@ -2019,15 +2046,15 @@ async function refreshPagoPreview(){
     <div class="deudores-summary">
       ${totalPesos>0 ? `<div class="chip" style="background:#eef1ff;border-color:#d9dcff;color:#4842c9;">Total del día $ : $${totalPesos.toLocaleString('es-AR')}</div>` : ""}
       ${totalUsd>0 ? `<div class="chip" style="background:#eef1ff;border-color:#d9dcff;color:#4842c9;">Total del día USD : US$ ${totalUsd.toLocaleString('es-AR')}</div>` : ""}
-      ${profPesos>0 ? `<div class="chip" style="background:#f4f4f6;border-color:#e7e7ea;color:#5f6368;">Cobrado por el profesional $ : $${profPesos.toLocaleString('es-AR')}</div>` : ""}
-      ${profUsd>0 ? `<div class="chip" style="background:#f4f4f6;border-color:#e7e7ea;color:#5f6368;">Cobrado por el profesional USD : US$ ${profUsd.toLocaleString('es-AR')}</div>` : ""}
+      ${profPesos>0 ? `<div class="chip" style="background:#f0e8cf;border-color:#e6dbc2;color:#7a7159;">Cobrado por el profesional $ : $${profPesos.toLocaleString('es-AR')}</div>` : ""}
+      ${profUsd>0 ? `<div class="chip" style="background:#f0e8cf;border-color:#e6dbc2;color:#7a7159;">Cobrado por el profesional USD : US$ ${profUsd.toLocaleString('es-AR')}</div>` : ""}
       ${ummPesos>0 ? `<div class="chip" style="background:#e3f1de;border-color:#c6e3ba;color:#2f7a2f;">A pagar (cobrado por Ummana) $ : $${ummPesos.toLocaleString('es-AR')}</div>` : ""}
       ${ummUsd>0 ? `<div class="chip" style="background:#e3f1de;border-color:#c6e3ba;color:#2f7a2f;">A pagar (cobrado por Ummana) USD : US$ ${ummUsd.toLocaleString('es-AR')}</div>` : ""}
     </div>
     ${lineas.map(l=>`
       <div class="deuda-row">
         <div class="deuda-info"><span class="nom">${l.pac}</span><span class="det">${l.concepto}${l.notas ? " · " + l.notas : ""} — ${l.cobradoPor==='profesional' ? 'cobró el profesional' : 'cobró Ummana'}</span></div>
-        <span class="deuda-total" style="color:${l.cobradoPor==='profesional' ? '#5f6368' : '#2f7a2f'};">${fmtMonto(l.valor, l.moneda)}</span>
+        <span class="deuda-total" style="color:${l.cobradoPor==='profesional' ? '#7a7159' : '#2f7a2f'};">${fmtMonto(l.valor, l.moneda)}</span>
       </div>
     `).join('')}
   `;
@@ -2075,7 +2102,7 @@ document.getElementById('btnExportarPago').onclick = ()=>{
   if(profPesos || profUsd){ doc.text(`Cobrado por el profesional: $ ${profPesos.toLocaleString('es-AR')}   ·   US$ ${profUsd.toLocaleString('es-AR')}`, 40, y); y+=16; }
   doc.setFont('helvetica','bold'); doc.setFontSize(12);
   doc.text(`A pagar (cobrado por Ummana): $ ${ummPesos.toLocaleString('es-AR')}   ·   US$ ${ummUsd.toLocaleString('es-AR')}`, 40, y);
-  doc.save(`pago-${prof.replace(/[^a-z0-9]+/gi,'-')}-${fechaISO}.pdf`);
+  mostrarPreviewPDF(doc, `pago-${prof.replace(/[^a-z0-9]+/gi,'-')}-${fechaISO}.pdf`);
 };
 
 /* =====================================================================
