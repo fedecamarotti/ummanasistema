@@ -241,7 +241,7 @@
   .panel-container{position:relative;}
   .panel-blur{filter:blur(6px);pointer-events:none;user-select:none;}
   .panel-gate{
-    position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    position:fixed;inset:0;display:none;align-items:center;justify-content:center;
     z-index:40;padding:20px;
   }
   .panel-gate.show{display:flex;}
@@ -705,7 +705,7 @@
   <div class="modal" style="max-width:900px;">
     <button class="close-x" id="closeProfesionalesPanel">✕</button>
     <h2>Profesionales / Área</h2>
-    <div class="modal-sub">Orden alfabético — definí si cada uno es ingreso o egreso. Esto determina cómo se carga el movimiento (paciente o destinatario) y de qué color se ve el total.</div>
+    <div class="modal-sub">Orden alfabético — nombres de profesionales/área. El tipo ingreso/egreso ahora se define por concepto, en el panel de Conceptos.</div>
     <div class="lista-toolbar">
       <input type="text" id="buscarProfesionalInput" placeholder="Buscar profesional/área…" autocomplete="off">
       <button class="addbtn" id="btnNuevoProfesional" title="Agregar profesional/área">+</button>
@@ -728,7 +728,7 @@
   <div class="modal" style="max-width:1000px;">
     <button class="close-x" id="closeConceptos">✕</button>
     <h2>Conceptos</h2>
-    <div class="modal-sub">Escribí para buscar por área, código o concepto.</div>
+    <div class="modal-sub">Escribí para buscar por área, código o concepto. Definí acá si cada uno es ingreso o egreso — todo lo que no toques queda como Ingreso.</div>
     <div class="lista-toolbar">
       <input type="text" id="buscarConceptoInput" placeholder="Buscar…" autocomplete="off">
       <button class="addbtn" id="btnNuevoConcepto" title="Agregar concepto">+</button>
@@ -885,8 +885,8 @@ const db = firebase.firestore();
    ===================================================================== */
 let CONCEPTOS = {};              // { "SUEROTERAPIA": [{concepto, codigo}, ...], ... }
 let CODIGO_POR_CONCEPTO = {};    // "SUEROTERAPIA||SUERO BASE..." -> "SUE-01", para buscar el código al guardar
-let PROFESIONALES_TIPO = {};     // { "SUEROTERAPIA": "ingreso", "GASTOS": "egreso", ... }
-function esEgreso(prof){ return PROFESIONALES_TIPO[prof] === "egreso"; }
+let TIPO_POR_CONCEPTO = {};      // "SUEROTERAPIA||SUERO BASE..." -> "ingreso" | "egreso" (por defecto: ingreso)
+function esEgreso(prof, concepto){ return TIPO_POR_CONCEPTO[prof+"||"+concepto] === "egreso"; }
 
 const MEDIO_LABELS = {
   efectivo: (m)=> m.moneda==="USD" ? "Efectivo USD" : "Efectivo $",
@@ -1111,23 +1111,23 @@ function iniciarListeners(){
   unsubConceptos = db.collection('conceptos').orderBy('profesional').onSnapshot(snap=>{
     CONCEPTOS = {};
     CODIGO_POR_CONCEPTO = {};
+    TIPO_POR_CONCEPTO = {};
     snap.docs.forEach(d=>{
       const c = d.data();
       if(!CONCEPTOS[c.profesional]) CONCEPTOS[c.profesional] = [];
-      CONCEPTOS[c.profesional].push({concepto: c.concepto, codigo: c.codigo||""});
+      CONCEPTOS[c.profesional].push({concepto: c.concepto, codigo: c.codigo||"", tipo: c.tipo||"ingreso"});
       CODIGO_POR_CONCEPTO[c.profesional+"||"+c.concepto] = c.codigo||"";
+      TIPO_POR_CONCEPTO[c.profesional+"||"+c.concepto] = c.tipo||"ingreso";
     });
     poblarProfesionalesUI();
+    actualizarCampoPacienteSegunTipo();
+    renderTabla();
     if(overlayConceptos.classList.contains('show')) renderConceptosBusqueda();
   });
 
   // Tipo (ingreso/egreso) de cada profesional/área
   unsubProfesionales = db.collection('profesionales').onSnapshot(snap=>{
-    PROFESIONALES_TIPO = {};
     profesionalesFullList = snap.docs.map(d=> ({id:d.id, ...d.data()}));
-    profesionalesFullList.forEach(p=> PROFESIONALES_TIPO[p.nombre] = p.tipo);
-    actualizarCampoPacienteSegunTipo();
-    renderTabla();
     if(overlayProfesionalesPanel.classList.contains('show')) renderProfesionalesBusqueda();
   });
 
@@ -1282,7 +1282,7 @@ function pasaFiltros(m){
 function renderTabla(){
   tbody.innerHTML = "";
   movimientos.filter(pasaFiltros).forEach(m=>{
-    const esGasto = esEgreso(m.prof);
+    const esGasto = esEgreso(m.prof, m.concepto);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="editcol"><button class="editbtn" title="Editar" onclick="abrirEdicion('${m.id}')">&#9998;</button></td>
@@ -1310,7 +1310,7 @@ function calcularEsperadoCaja(){
   let ingresos = 0, egresos = 0;
   movimientosHoy.forEach(m=>{
     if(m.moneda !== "$") return;
-    const esGasto = esEgreso(m.prof);
+    const esGasto = esEgreso(m.prof, m.concepto);
     pagosDe(m).filter(p=>p.medio==="efectivo").forEach(p=>{
       // Si lo cobró el profesional directamente, esa plata nunca entró a nuestra caja física.
       if(!esGasto && p.cobradoPor === "profesional") return;
@@ -1548,7 +1548,7 @@ function actualizarConceptosDesdeProfesional(){
 attachAutocomplete(selConcepto, ()=> conceptosDisponiblesActual.map(c=>c.concepto));
 
 function actualizarCampoPacienteSegunTipo(){
-  const egreso = esEgreso(selProfesional.value);
+  const egreso = esEgreso(selProfesional.value, selConcepto.value);
   document.getElementById('campoPacienteIngreso').classList.toggle('col-hidden', egreso);
   document.getElementById('campoPacienteEgreso').classList.toggle('col-hidden', !egreso);
   document.getElementById('pagosLista').classList.toggle('oculta-quien', egreso);
@@ -1558,6 +1558,7 @@ function actualizarCampoPacienteSegunTipo(){
     refreshDeudasPaciente();
   }
 }
+selConcepto.addEventListener('input', actualizarCampoPacienteSegunTipo);
 
 function poblarProfesionalesUI(){
   actualizarConceptosDesdeProfesional();
@@ -1605,6 +1606,7 @@ function abrirEdicion(id){
   selProfesional.value = m.prof;
   actualizarConceptosDesdeProfesional();
   selConcepto.value = m.concepto;
+  actualizarCampoPacienteSegunTipo();
   refreshDeudasPaciente();
 
   document.getElementById('inpNotas').value = m.notas || "";
@@ -1759,7 +1761,7 @@ inpValor.addEventListener('input', ()=>{
 
 
 btnGuardarMov.onclick = async ()=>{
-  const egreso = esEgreso(selProfesional.value);
+  const egreso = esEgreso(selProfesional.value, selConcepto.value);
   const pacValor = egreso ? document.getElementById('inpDestinatario').value.trim() : selPaciente.value;
   if(!pacValor){ alert(egreso ? "Ingresá a quién se le paga." : "Elegí un paciente/alumno."); return; }
   if(!selProfesional.value){ alert("Elegí un profesional/área."); return; }
@@ -1945,7 +1947,7 @@ document.getElementById('descargarPreviewPDF').onclick = ()=>{
 };
 
 function construirFilaVisual(m){
-  const esGasto = esEgreso(m.prof);
+  const esGasto = esEgreso(m.prof, m.concepto);
   const totalClass = m.valor==0 ? '' : (esGasto?'egreso':'ingreso');
   return `
     <tr>
@@ -1971,7 +1973,7 @@ async function generarPNGReporteDiario(filas, fechaISO, sesiones){
   let inPesosMp=0, outPesosMp=0, inPesosTransf=0, outPesosTransf=0;
   const pagosProfesionales = [];
   filas.forEach(m=>{
-    const esGasto = esEgreso(m.prof);
+    const esGasto = esEgreso(m.prof, m.concepto);
     if(/honorario/i.test(m.concepto||"")) pagosProfesionales.push(m);
     pagosDe(m).forEach(p=>{
       if(p.medio==="efectivo"){
@@ -2058,7 +2060,7 @@ function generarPDFReporteDiario(filas, fechaISO, sesiones){
         const m = filas[data.row.index];
         if(m.valor != 0){
           data.cell.styles.fontStyle = 'bold';
-          if(esEgreso(m.prof)){ data.cell.styles.fillColor = ROJO_BG; data.cell.styles.textColor = ROJO_TXT; }
+          if(esEgreso(m.prof, m.concepto)){ data.cell.styles.fillColor = ROJO_BG; data.cell.styles.textColor = ROJO_TXT; }
           else { data.cell.styles.fillColor = VERDE_BG; data.cell.styles.textColor = VERDE_TXT; }
         }
       }
@@ -2070,7 +2072,7 @@ function generarPDFReporteDiario(filas, fechaISO, sesiones){
   let inPesosMp=0, outPesosMp=0, inPesosTransf=0, outPesosTransf=0;
   const pagosProfesionales = [];
   filas.forEach(m=>{
-    const esGasto = esEgreso(m.prof);
+    const esGasto = esEgreso(m.prof, m.concepto);
     if(/honorario/i.test(m.concepto||"")) pagosProfesionales.push(m);
     pagosDe(m).forEach(p=>{
       if(p.medio==="efectivo"){
@@ -2157,7 +2159,7 @@ const overlayPago = document.getElementById('overlayPago');
 const selProfesionalPago = document.getElementById('selProfesionalPago');
 const inpFechaPago = document.getElementById('inpFechaPago');
 let pagoMovsActuales = [];
-attachAutocomplete(selProfesionalPago, ()=> Object.keys(CONCEPTOS).filter(p=>!esEgreso(p)));
+attachAutocomplete(selProfesionalPago, ()=> Object.keys(CONCEPTOS).sort());
 
 document.getElementById('btnPagoProfesional').onclick = ()=>{
   selProfesionalPago.value = "";
@@ -2301,7 +2303,7 @@ document.getElementById('btnGenerarInforme').onclick = async ()=>{
 
     let ingresosPesos=0, egresosPesos=0, ingresosUsd=0, egresosUsd=0;
     filas.forEach(m=>{
-      const out = esEgreso(m.prof);
+      const out = esEgreso(m.prof, m.concepto);
       if(out){
         if(m.moneda==="USD") egresosUsd+=m.valor; else egresosPesos+=m.valor;
       } else {
@@ -2844,9 +2846,9 @@ buscarProfesionalInput.addEventListener('input', renderProfesionalesBusqueda);
 // (por ejemplo, recién importado desde el CSV de conceptos).
 function listaProfesionalesCombinada(){
   const porNombre = {};
-  profesionalesFullList.forEach(p=> porNombre[p.nombre] = {id:p.id, nombre:p.nombre, tipo:p.tipo||"ingreso"});
+  profesionalesFullList.forEach(p=> porNombre[p.nombre] = {id:p.id, nombre:p.nombre});
   Object.keys(CONCEPTOS).forEach(nombre=>{
-    if(!porNombre[nombre]) porNombre[nombre] = {id:null, nombre, tipo:"ingreso"};
+    if(!porNombre[nombre]) porNombre[nombre] = {id:null, nombre};
   });
   return Object.values(porNombre).sort((a,b)=> a.nombre.localeCompare(b.nombre,'es'));
 }
@@ -2855,10 +2857,6 @@ function filaProfesionalHTML(p, esNueva){
   return `
     <div class="fila-editable" data-nombre="${p.nombre||''}" data-id="${p.id||''}">
       <input type="text" class="col pf-nombre" value="${p.nombre||''}" placeholder="Nombre del profesional/área">
-      <select class="col-chico pf-tipo">
-        <option value="ingreso" ${p.tipo!=='egreso'?'selected':''}>Ingreso</option>
-        <option value="egreso" ${p.tipo==='egreso'?'selected':''}>Egreso</option>
-      </select>
       <button class="btn-guardar-fila" onclick="${esNueva ? 'crearProfesionalFila(this)' : 'guardarProfesionalFila(this)'}">${esNueva ? "Crear" : "Guardar"}</button>
       ${esNueva ? "" : `<button class="btn-eliminar-fila" onclick="eliminarProfesionalFila('${p.id||''}', '${p.nombre}', this)" title="Eliminar">✕</button>`}
     </div>
@@ -2869,7 +2867,7 @@ function renderProfesionalesBusqueda(){
   const q = buscarProfesionalInput.value.trim().toLowerCase();
   const cont = document.getElementById('profesionalesScroll');
   const lista = listaProfesionalesCombinada().filter(p=> !q || p.nombre.toLowerCase().includes(q));
-  const nuevaFila = mostrarNuevoProfesional ? filaProfesionalHTML({tipo:"ingreso"}, true) : "";
+  const nuevaFila = mostrarNuevoProfesional ? filaProfesionalHTML({}, true) : "";
   if(!lista.length && !nuevaFila){ cont.innerHTML = '<div class="empty-state">No encontré profesionales/área con ese nombre.</div>'; return; }
   cont.innerHTML = nuevaFila + lista.map(p=> filaProfesionalHTML(p, false)).join('');
 }
@@ -2877,11 +2875,10 @@ function renderProfesionalesBusqueda(){
 async function crearProfesionalFila(btn){
   const fila = btn.closest('.fila-editable');
   const nombre = fila.querySelector('.pf-nombre').value.trim();
-  const tipo = fila.querySelector('.pf-tipo').value;
   if(!nombre){ alert("El nombre no puede quedar vacío."); return; }
   btn.disabled = true; btn.textContent = "Creando…";
   try{
-    await db.collection('profesionales').add({nombre, tipo});
+    await db.collection('profesionales').add({nombre});
     mostrarNuevoProfesional = false;
   }catch(e){
     alert("No se pudo crear: " + e.message);
@@ -2894,15 +2891,14 @@ async function guardarProfesionalFila(btn){
   const fila = btn.closest('.fila-editable');
   const id = fila.dataset.id;
   const nombre = fila.querySelector('.pf-nombre').value.trim();
-  const tipo = fila.querySelector('.pf-tipo').value;
   if(!nombre){ alert("El nombre no puede quedar vacío."); return; }
   const txtOriginal = btn.textContent;
   btn.disabled = true; btn.textContent = "Guardando…";
   try{
     if(id){
-      await db.collection('profesionales').doc(id).update({nombre, tipo});
+      await db.collection('profesionales').doc(id).update({nombre});
     } else {
-      await db.collection('profesionales').add({nombre, tipo});
+      await db.collection('profesionales').add({nombre});
     }
     btn.textContent = "¡Guardado!";
     setTimeout(()=>{ btn.textContent = txtOriginal; btn.disabled = false; }, 1200);
@@ -2938,10 +2934,7 @@ async function eliminarProfesionalFila(id, nombre, btn){
 window.eliminarProfesionalFila = eliminarProfesionalFila;
 
 document.getElementById('btnExportarProfesionales').onclick = ()=>{
-  const filas = listaProfesionalesCombinada().map(p=> ({
-    "Profesional/Área": p.nombre,
-    "Tipo": p.tipo==="egreso" ? "Egreso" : "Ingreso",
-  }));
+  const filas = listaProfesionalesCombinada().map(p=> ({ "Profesional/Área": p.nombre }));
   const ws = XLSX.utils.json_to_sheet(filas);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Profesionales");
@@ -2962,14 +2955,12 @@ document.getElementById('inpImportarProfesionales').addEventListener('change', a
     let creados = 0, actualizados = 0;
     for(const fila of filas){
       const nombre = (fila["Profesional/Área"] || fila["Profesional/Area"] || fila["Nombre"] || "").toString().trim();
-      const tipoTxt = (fila["Tipo"] || "").toString().trim().toLowerCase();
       if(!nombre) continue;
-      const tipo = tipoTxt.startsWith("egr") ? "egreso" : "ingreso";
       if(existentesPorNombre[nombre]){
-        await db.collection('profesionales').doc(existentesPorNombre[nombre]).update({nombre, tipo});
+        await db.collection('profesionales').doc(existentesPorNombre[nombre]).update({nombre});
         actualizados++;
       } else {
-        await db.collection('profesionales').add({nombre, tipo});
+        await db.collection('profesionales').add({nombre});
         creados++;
       }
     }
@@ -3004,7 +2995,7 @@ buscarConceptoInput.addEventListener('input', renderConceptosBusqueda);
 function todosLosConceptos(){
   const lista = [];
   Object.keys(CONCEPTOS).forEach(prof=>{
-    CONCEPTOS[prof].forEach(c=> lista.push({profesional: prof, concepto: c.concepto, codigo: c.codigo}));
+    CONCEPTOS[prof].forEach(c=> lista.push({profesional: prof, concepto: c.concepto, codigo: c.codigo, tipo: c.tipo||"ingreso"}));
   });
   return lista.sort((a,b)=> a.profesional.localeCompare(b.profesional,'es') || (a.codigo||"").localeCompare(b.codigo||"",'es',{numeric:true}));
 }
@@ -3018,6 +3009,10 @@ function filaConceptoHTML(c, esNueva){
       </select>
       <input type="text" class="col-chico cc-codigo" value="${c.codigo||""}" placeholder="Código">
       <input type="text" class="col cc-concepto" value="${c.concepto||""}" placeholder="Concepto">
+      <select class="col-chico cc-tipo">
+        <option value="ingreso" ${c.tipo!=='egreso'?'selected':''}>Ingreso</option>
+        <option value="egreso" ${c.tipo==='egreso'?'selected':''}>Egreso</option>
+      </select>
       <button class="btn-guardar-fila" onclick="${esNueva ? 'crearConceptoFila(this)' : 'guardarConceptoFila(this)'}">${esNueva ? "Crear" : "Guardar"}</button>
       ${esNueva ? "" : `<button class="btn-eliminar-fila" onclick="eliminarConceptoFila(this)" title="Eliminar">✕</button>`}
     </div>
@@ -3040,11 +3035,12 @@ async function crearConceptoFila(btn){
   const profesional = fila.querySelector('.cc-profesional').value;
   const concepto = fila.querySelector('.cc-concepto').value.trim();
   const codigo = fila.querySelector('.cc-codigo').value.trim();
+  const tipo = fila.querySelector('.cc-tipo').value;
   if(!profesional){ alert("Elegí un profesional/área (creá uno primero en Profesionales/Áreas si no existe)."); return; }
   if(!concepto){ alert("El concepto no puede quedar vacío."); return; }
   btn.disabled = true; btn.textContent = "Creando…";
   try{
-    await db.collection('conceptos').add({profesional, concepto, codigo});
+    await db.collection('conceptos').add({profesional, concepto, codigo, tipo});
     mostrarNuevoConcepto = false;
   }catch(e){
     alert("No se pudo crear: " + e.message);
@@ -3060,6 +3056,7 @@ async function guardarConceptoFila(btn){
   const profesional = fila.querySelector('.cc-profesional').value;
   const concepto = fila.querySelector('.cc-concepto').value.trim();
   const codigo = fila.querySelector('.cc-codigo').value.trim();
+  const tipo = fila.querySelector('.cc-tipo').value;
   if(!concepto){ alert("El concepto no puede quedar vacío."); return; }
   const txtOriginal = btn.textContent;
   btn.disabled = true; btn.textContent = "Guardando…";
@@ -3069,7 +3066,7 @@ async function guardarConceptoFila(btn){
       .where('concepto','==', conceptoOriginal)
       .limit(1).get();
     if(snap.empty){ throw new Error("No encontré el concepto original en la base."); }
-    await snap.docs[0].ref.update({profesional, concepto, codigo});
+    await snap.docs[0].ref.update({profesional, concepto, codigo, tipo});
     btn.textContent = "¡Guardado!";
     setTimeout(()=>{ btn.textContent = txtOriginal; btn.disabled = false; }, 1200);
   }catch(e){
@@ -3104,6 +3101,7 @@ document.getElementById('btnExportarConceptos').onclick = ()=>{
     "Área": c.profesional,
     "Código": c.codigo || "",
     "Concepto": c.concepto,
+    "Tipo": c.tipo==="egreso" ? "Egreso" : "Ingreso",
   }));
   const ws = XLSX.utils.json_to_sheet(filas);
   const wb = XLSX.utils.book_new();
@@ -3125,8 +3123,10 @@ document.getElementById('inpImportarConceptos').addEventListener('change', async
       const profesional = (fila["Área"] || fila["Area"] || fila["Profesional"] || "").toString().trim();
       const codigo = (fila["Código"] || fila["Codigo"] || "").toString().trim();
       const concepto = (fila["Concepto"] || "").toString().trim();
+      const tipoTxt = (fila["Tipo"] || "").toString().trim().toLowerCase();
+      const tipo = tipoTxt.startsWith("egr") ? "egreso" : "ingreso";
       if(!profesional || !concepto){ ignorados++; continue; }
-      await db.collection('conceptos').add({profesional, concepto, codigo});
+      await db.collection('conceptos').add({profesional, concepto, codigo, tipo});
       creados++;
     }
     info.textContent = `Listo: ${creados} conceptos agregados` + (ignorados ? ` (se ignoraron ${ignorados} filas sin área o concepto)` : "") + `. Si algún nombre ya existía, quedó duplicado — revisalo en el panel.`;
