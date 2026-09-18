@@ -715,6 +715,40 @@
   </div>
 </div>
 
+<!-- ============ MODAL: EDITAR CAJA (admin) ============ -->
+<div class="overlay" id="overlayEditarCaja">
+  <div class="modal">
+    <button class="close-x" id="closeEditarCaja">✕</button>
+    <h2>Editar caja</h2>
+    <div class="modal-sub">La misma persona que abre es la que cierra.</div>
+    <div class="field">
+      <label>Nombre</label>
+      <input type="text" id="ecNombre" placeholder="Nombre de la recepcionista">
+    </div>
+    <div class="field">
+      <label>Fecha</label>
+      <input type="date" id="ecFecha">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Monto de apertura ($)</label>
+        <input type="text" id="ecApertura" inputmode="numeric" oninput="formatearMiles(this)">
+      </div>
+      <div class="field">
+        <label>Monto de cierre ($) <span class="opt">(vacío si sigue abierta)</span></label>
+        <input type="text" id="ecCierre" inputmode="numeric" oninput="formatearMiles(this)">
+      </div>
+    </div>
+    <div class="modal-actions between">
+      <button class="btn btn-eliminar" id="eliminarEditarCaja">Eliminar registro</button>
+      <div style="display:flex;gap:8px;margin-left:auto;">
+        <button class="btn" id="cancelEditarCaja">Cancelar</button>
+        <button class="btn btn-primary" id="guardarEditarCaja">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ============ MODAL: PACIENTES (buscar y editar) ============ -->
 <div class="overlay" id="overlayPacientes">
   <div class="modal" style="max-width:1100px;">
@@ -949,6 +983,12 @@ function excelSerialToISODate(valor){
 function formatearMiles(input){
   const raw = input.value.replace(/\D/g,"");
   input.value = raw ? Number(raw).toLocaleString('es-AR') : "";
+}
+
+function todosLosNombresDeProfesionales(){
+  const set = new Set(Object.keys(CONCEPTOS));
+  profesionalesFullList.forEach(p=> set.add(p.nombre));
+  return [...set].sort((a,b)=> a.localeCompare(b,'es'));
 }
 
 function hoyISO(){
@@ -1636,7 +1676,7 @@ document.getElementById('guardarProveedor').onclick = async ()=>{
     alert("No se pudo guardar: " + e.message);
   }
 };
-attachAutocomplete(selProfesional, ()=> Object.keys(CONCEPTOS).sort());
+attachAutocomplete(selProfesional, ()=> todosLosNombresDeProfesionales());
 selProfesional.addEventListener('input', actualizarConceptosDesdeProfesional);
 
 document.getElementById('btnNuevo').onclick = ()=>{
@@ -2219,7 +2259,7 @@ const overlayPago = document.getElementById('overlayPago');
 const selProfesionalPago = document.getElementById('selProfesionalPago');
 const inpFechaPago = document.getElementById('inpFechaPago');
 let pagoMovsActuales = [];
-attachAutocomplete(selProfesionalPago, ()=> Object.keys(CONCEPTOS).sort());
+attachAutocomplete(selProfesionalPago, ()=> todosLosNombresDeProfesionales());
 
 document.getElementById('btnPagoProfesional').onclick = ()=>{
   selProfesionalPago.value = "";
@@ -2325,7 +2365,7 @@ async function generarPNGPagoProfesional(prof, fechaISO, movs){
    ===================================================================== */
 const overlayInformes = document.getElementById('overlayInformes');
 const informeProfesional = document.getElementById('informeProfesional');
-attachAutocomplete(informeProfesional, ()=> ["Todos", ...Object.keys(CONCEPTOS).sort()]);
+attachAutocomplete(informeProfesional, ()=> ["Todos", ...todosLosNombresDeProfesionales()]);
 
 document.getElementById('btnInformes').onclick = ()=>{
   const hoy = hoyISO();
@@ -2607,81 +2647,116 @@ async function cargarCajas(){
     const snap = await db.collection('cajaSesiones')
       .where('fechaISO','>=', mesCajasInicioISO())
       .where('fechaISO','<', mesCajasFinISO())
-      .orderBy('fechaISO','desc')
+      .orderBy('fechaISO','asc')
+      .orderBy('abiertaEn','asc')
       .get();
     if(snap.empty){ cont.innerHTML = '<div class="empty-state">No hay aperturas registradas este mes.</div>'; return; }
-    cont.innerHTML = '<div class="lista-rows">' + snap.docs.map(d=>{
+    cajasCache = {};
+    const filas = snap.docs.map(d=>{
       const c = d.data();
-      let badgeTxt = "Caja abierta";
-      if(c.cerradaEn){
-        badgeTxt = c.diferencia === 0 ? "Coincide" : (c.diferencia>0 ? `+$${Math.abs(c.diferencia).toLocaleString('es-AR')}` : `-$${Math.abs(c.diferencia).toLocaleString('es-AR')}`);
-      }
+      cajasCache[d.id] = c;
+      const horaApertura = c.abiertaEn ? c.abiertaEn.toDate().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : "—";
+      const horaCierre = c.cerradaEn ? c.cerradaEn.toDate().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : "";
+      const diferencia = c.diferencia;
+      const difTxt = (!c.cerradaEn) ? "—"
+        : (!diferencia ? "$0" : `${diferencia>0?'+':'-'}$${Math.abs(diferencia).toLocaleString('es-AR')}`);
+      const difStyle = (c.cerradaEn && diferencia) ? 'color:#a13a3a;font-weight:700;' : 'color:var(--muted);';
       return `
-        <div class="fila-editable" data-id="${d.id}">
-          <input type="date" class="col-chico cr-fecha" value="${c.fechaISO||''}" title="Fecha">
-          <input type="text" class="col cr-recepcionista" value="${c.recepcionista||''}" placeholder="Quién abrió">
-          <input type="text" class="col cr-cerradapor" value="${c.cerradaPor||''}" placeholder="Quién cerró">
-          <input type="text" class="col-chico cr-apertura" value="${c.aperturaMonto!=null?Number(c.aperturaMonto).toLocaleString('es-AR'):''}" placeholder="Apertura $" oninput="formatearMiles(this)">
-          <input type="text" class="col-chico cr-esperado" value="${c.esperadoCierre!=null?Number(c.esperadoCierre).toLocaleString('es-AR'):''}" placeholder="Esperado $" oninput="formatearMiles(this)">
-          <input type="text" class="col-chico cr-contado" value="${c.montoContado!=null?Number(c.montoContado).toLocaleString('es-AR'):''}" placeholder="Contado $" oninput="formatearMiles(this)">
-          <span class="badge ${badgeTxt==='Coincide'?'badge-efectivo':(badgeTxt==='Caja abierta'?'badge-abierta':'badge-debe')}">${badgeTxt}</span>
-          <button class="btn-guardar-fila" onclick="guardarCajaFila('${d.id}', this)">Guardar</button>
-          <button class="btn-eliminar-fila" onclick="eliminarCajaFila('${d.id}', this)" title="Eliminar">✕</button>
-        </div>
+        <tr>
+          <td class="left">${c.recepcionista||''}</td>
+          <td>
+            <div>${isoToDisplay(c.fechaISO)}</div>
+            <div style="font-size:9.5px;color:var(--muted);font-weight:400;">${horaApertura}${horaCierre ? ' - '+horaCierre : ''}</div>
+          </td>
+          <td>$${Number(c.aperturaMonto).toLocaleString('es-AR')}</td>
+          <td>${c.cerradaEn ? '$'+Number(c.montoContado).toLocaleString('es-AR') : '—'}</td>
+          <td style="${difStyle}">${difTxt}</td>
+          <td class="editcol"><button class="editbtn" title="Editar" onclick="abrirEdicionCaja('${d.id}')">&#9998;</button></td>
+        </tr>
       `;
-    }).join('') + '</div>';
+    }).join('');
+    cont.innerHTML = `
+      <div class="sheet-wrap" style="margin:0;">
+        <table style="width:100%;">
+          <thead>
+            <tr><th class="left">Nombre</th><th>Fecha</th><th>Apertura</th><th>Cierre</th><th>Diferencia</th><th></th></tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+    `;
   }catch(e){
     cont.innerHTML = `<div class="empty-state">Error al cargar: ${e.message}</div>`;
   }
 }
 
-async function guardarCajaFila(id, btn){
-  const fila = btn.closest('.fila-editable');
-  const fechaISO = fila.querySelector('.cr-fecha').value;
+let cajasCache = {};
+const overlayEditarCaja = document.getElementById('overlayEditarCaja');
+let editandoCajaId = null;
+
+function abrirEdicionCaja(id){
+  const c = cajasCache[id];
+  if(!c) return;
+  editandoCajaId = id;
+  document.getElementById('ecNombre').value = c.recepcionista || '';
+  document.getElementById('ecFecha').value = c.fechaISO || '';
+  document.getElementById('ecApertura').value = c.aperturaMonto!=null ? Number(c.aperturaMonto).toLocaleString('es-AR') : '';
+  document.getElementById('ecCierre').value = c.montoContado!=null ? Number(c.montoContado).toLocaleString('es-AR') : '';
+  overlayEditarCaja.classList.add('show');
+}
+window.abrirEdicionCaja = abrirEdicionCaja;
+document.getElementById('closeEditarCaja').onclick = ()=> overlayEditarCaja.classList.remove('show');
+document.getElementById('cancelEditarCaja').onclick = ()=> overlayEditarCaja.classList.remove('show');
+
+document.getElementById('guardarEditarCaja').onclick = async ()=>{
+  if(!editandoCajaId) return;
+  const c = cajasCache[editandoCajaId];
+  const nombre = document.getElementById('ecNombre').value.trim();
+  const fechaISO = document.getElementById('ecFecha').value;
+  const aperturaTxt = document.getElementById('ecApertura').value.replace(/\D/g,"");
+  const cierreTxt = document.getElementById('ecCierre').value.replace(/\D/g,"");
+  if(!nombre){ alert("Ingresá el nombre."); return; }
   if(!fechaISO){ alert("Elegí una fecha."); return; }
-  const recepcionista = fila.querySelector('.cr-recepcionista').value.trim();
-  const cerradaPor = fila.querySelector('.cr-cerradapor').value.trim();
-  const aperturaTxt = fila.querySelector('.cr-apertura').value.replace(/\D/g,"");
-  const esperadoTxt = fila.querySelector('.cr-esperado').value.replace(/\D/g,"");
-  const contadoTxt = fila.querySelector('.cr-contado').value.replace(/\D/g,"");
   if(!aperturaTxt){ alert("Ingresá el monto de apertura."); return; }
+  if(!confirm("¿Guardar los cambios de esta caja?")) return;
 
   const cambios = {
-    fechaISO, recepcionista,
-    cerradaPor: cerradaPor || null,
+    recepcionista: nombre, cerradaPor: nombre, fechaISO,
     aperturaMonto: Number(aperturaTxt),
-    esperadoCierre: esperadoTxt ? Number(esperadoTxt) : null,
-    montoContado: contadoTxt ? Number(contadoTxt) : null,
   };
-  if(cambios.esperadoCierre!=null && cambios.montoContado!=null){
-    cambios.diferencia = cambios.montoContado - cambios.esperadoCierre;
+  if(cierreTxt){
+    cambios.montoContado = Number(cierreTxt);
+    if(c.esperadoCierre != null){
+      cambios.diferencia = cambios.montoContado - c.esperadoCierre;
+    }
   }
 
-  const txtOriginal = btn.textContent;
+  const btn = document.getElementById('guardarEditarCaja');
   btn.disabled = true; btn.textContent = "Guardando…";
   try{
-    await db.collection('cajaSesiones').doc(id).update(cambios);
-    btn.textContent = "¡Guardado!";
-    setTimeout(()=>{ cargarCajas(); }, 700);
+    await db.collection('cajaSesiones').doc(editandoCajaId).update(cambios);
+    overlayEditarCaja.classList.remove('show');
+    cargarCajas();
   }catch(e){
     alert("No se pudo guardar: " + e.message);
-    btn.disabled = false; btn.textContent = txtOriginal;
   }
-}
-window.guardarCajaFila = guardarCajaFila;
+  btn.disabled = false; btn.textContent = "Guardar";
+};
 
-async function eliminarCajaFila(id, btn){
+document.getElementById('eliminarEditarCaja').onclick = async ()=>{
+  if(!editandoCajaId) return;
   if(!confirm("¿Eliminar este registro de apertura/cierre de caja? Esta acción no se puede deshacer.")) return;
+  const btn = document.getElementById('eliminarEditarCaja');
   btn.disabled = true;
   try{
-    await db.collection('cajaSesiones').doc(id).delete();
+    await db.collection('cajaSesiones').doc(editandoCajaId).delete();
+    overlayEditarCaja.classList.remove('show');
     cargarCajas();
   }catch(e){
     alert("No se pudo eliminar: " + e.message);
     btn.disabled = false;
   }
-}
-window.eliminarCajaFila = eliminarCajaFila;
+};
 
 /* =====================================================================
    PANEL "PACIENTES" (buscar y editar, para ambos roles)
@@ -3094,7 +3169,7 @@ function todosLosConceptos(){
 }
 
 function filaConceptoHTML(c, esNueva){
-  const opcionesProf = Object.keys(CONCEPTOS).sort();
+  const opcionesProf = todosLosNombresDeProfesionales();
   return `
     <div class="fila-editable" data-profesional-original="${c.profesional||''}" data-concepto-original="${c.concepto||''}">
       <select class="col-chico cc-profesional">
@@ -3118,7 +3193,7 @@ function renderConceptosBusqueda(){
   const lista = todosLosConceptos().filter(c=> !q ||
     c.profesional.toLowerCase().includes(q) || c.concepto.toLowerCase().includes(q) || (c.codigo||"").toLowerCase().includes(q)
   );
-  const nuevaFila = mostrarNuevoConcepto ? filaConceptoHTML({profesional: Object.keys(CONCEPTOS).sort()[0]||""}, true) : "";
+  const nuevaFila = mostrarNuevoConcepto ? filaConceptoHTML({profesional: todosLosNombresDeProfesionales()[0]||""}, true) : "";
   if(!lista.length && !nuevaFila){ cont.innerHTML = '<div class="empty-state">No encontré conceptos con esa búsqueda.</div>'; return; }
   cont.innerHTML = nuevaFila + lista.map(c=> filaConceptoHTML(c, false)).join('');
 }
