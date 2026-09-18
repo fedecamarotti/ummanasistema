@@ -2015,11 +2015,18 @@ function limpiarTextoPDF(str){
 const overlayPreviewPDF = document.getElementById('overlayPreviewPDF');
 let pdfListoParaDescargar = null;
 
+function cerrarOtrosOverlays(idExcluido){
+  document.querySelectorAll('.overlay.show').forEach(ov=>{
+    if(ov.id !== idExcluido) ov.classList.remove('show');
+  });
+}
+
 function mostrarPreviewPDF(doc, filename){
   pdfListoParaDescargar = {tipo:'pdf', doc, filename};
   document.getElementById('iframePreviewPDF').style.display = 'block';
   document.getElementById('imgPreviewPNG').style.display = 'none';
   document.getElementById('iframePreviewPDF').src = doc.output('bloburl');
+  cerrarOtrosOverlays('overlayPreviewPDF');
   overlayPreviewPDF.classList.add('show');
 }
 function mostrarPreviewPNG(dataUrl, filename){
@@ -2027,6 +2034,7 @@ function mostrarPreviewPNG(dataUrl, filename){
   document.getElementById('imgPreviewPNG').style.display = 'block';
   document.getElementById('iframePreviewPDF').style.display = 'none';
   document.getElementById('imgPreviewPNG').src = dataUrl;
+  cerrarOtrosOverlays('overlayPreviewPDF');
   overlayPreviewPDF.classList.add('show');
 }
 document.getElementById('closePreviewPDF').onclick = ()=> overlayPreviewPDF.classList.remove('show');
@@ -2281,7 +2289,7 @@ async function refreshPagoPreview(){
 
   preview.innerHTML = '<div class="empty-state">Buscando…</div>';
   try{
-    const snap = await db.collection('movimientos').where('fechaISO','==', fechaISO).where('prof','==', prof).get();
+    const snap = await db.collection('movimientos').where('fechaISO','==', fechaISO).where('prof','==', prof).orderBy('creadoEn','asc').get();
     pagoMovsActuales = snap.docs.map(d=> d.data());
   }catch(e){
     preview.innerHTML = `<div class="empty-state">Error al buscar: ${e.message}</div>`;
