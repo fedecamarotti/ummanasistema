@@ -1206,6 +1206,7 @@ function iniciarListeners(){
   unsubProfesionales = db.collection('profesionales').onSnapshot(snap=>{
     profesionalesFullList = snap.docs.map(d=> ({id:d.id, ...d.data()}));
     if(overlayProfesionalesPanel.classList.contains('show')) renderProfesionalesBusqueda();
+    if(overlayConceptos.classList.contains('show')) renderConceptosBusqueda();
   });
 
   // Proveedores/destinatarios de gastos
