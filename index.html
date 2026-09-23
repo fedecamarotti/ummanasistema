@@ -415,6 +415,7 @@
       <label>Monto inicial en efectivo ($)</label>
       <input type="text" id="inpAperturaMonto" inputmode="numeric" placeholder="0">
     </div>
+    <div class="warn-banner col-hidden" id="aperturaWarning"></div>
     <div class="modal-actions">
       <button class="btn" id="cancelApertura">Cancelar</button>
       <button class="btn btn-primary" id="confirmarApertura">Abrir caja</button>
@@ -1463,6 +1464,8 @@ function abrirModalApertura(){
   document.getElementById('aperturaSugeridaTxt').textContent = ultimoCierre !== null
     ? `Sugerido según el último cierre: $${ultimoCierre.toLocaleString('es-AR')}`
     : "No hay un cierre anterior registrado — ingresá el monto real con el que arrancás.";
+  document.getElementById('aperturaWarning').classList.add('col-hidden');
+  document.getElementById('confirmarApertura').textContent = "Abrir caja";
   overlayApertura.classList.add('show');
 }
 document.getElementById('closeApertura').onclick = ()=> overlayApertura.classList.remove('show');
@@ -1470,15 +1473,30 @@ document.getElementById('cancelApertura').onclick = ()=> overlayApertura.classLi
 inpAperturaMonto.addEventListener('input', ()=>{
   let raw = inpAperturaMonto.value.replace(/\D/g,"");
   inpAperturaMonto.value = raw ? Number(raw).toLocaleString('es-AR') : "";
+  document.getElementById('aperturaWarning').classList.add('col-hidden');
+  document.getElementById('confirmarApertura').textContent = "Abrir caja";
 });
 document.getElementById('confirmarApertura').onclick = async ()=>{
   const monto = Number(inpAperturaMonto.value.replace(/\D/g,""));
   if(inpAperturaMonto.value==="" || isNaN(monto)){ alert("Ingresá un monto de apertura."); return; }
   const fechaElegida = document.getElementById('inpFechaApertura').value;
   if(!fechaElegida){ alert("Elegí una fecha para esta caja."); return; }
+
+  const diferenciaApertura = ultimoCierre !== null ? (monto - ultimoCierre) : 0;
+  const warn = document.getElementById('aperturaWarning');
+  if(diferenciaApertura !== 0 && warn.classList.contains('col-hidden')){
+    warn.textContent = diferenciaApertura > 0
+      ? `⚠️ Estás abriendo con $${diferenciaApertura.toLocaleString('es-AR')} de más respecto del último cierre ($${ultimoCierre.toLocaleString('es-AR')}). Revisá antes de continuar.`
+      : `⚠️ Estás abriendo con $${Math.abs(diferenciaApertura).toLocaleString('es-AR')} de menos respecto del último cierre ($${ultimoCierre.toLocaleString('es-AR')}). Revisá antes de continuar.`;
+    warn.classList.remove('col-hidden');
+    document.getElementById('confirmarApertura').textContent = "Abrir caja de todos modos";
+    return;
+  }
+
   await db.collection('cajaSesiones').add({
     fechaISO: fechaElegida, recepcionista: currentUser.nombre,
     aperturaMonto: monto, abiertaEn: firebase.firestore.FieldValue.serverTimestamp(),
+    diferenciaApertura,
     cerradaEn: null, montoContado: null, esperadoCierre: null, diferencia: null,
   });
   overlayApertura.classList.remove('show');
@@ -2670,6 +2688,8 @@ async function cargarCajas(){
       const difTxt = (!c.cerradaEn) ? "—"
         : (!diferencia ? "$0" : `${diferencia>0?'+':'-'}$${Math.abs(diferencia).toLocaleString('es-AR')}`);
       const difStyle = (c.cerradaEn && diferencia) ? 'color:#a13a3a;font-weight:700;' : 'color:var(--muted);';
+      const difApertura = c.diferenciaApertura;
+      const difAperturaTxt = difApertura ? `${difApertura>0?'+':'-'}$${Math.abs(difApertura).toLocaleString('es-AR')} vs. cierre anterior` : "";
       return `
         <tr>
           <td class="left">${c.recepcionista||''}</td>
@@ -2677,7 +2697,10 @@ async function cargarCajas(){
             <div>${isoToDisplay(c.fechaISO)}</div>
             <div style="font-size:9.5px;color:var(--muted);font-weight:400;">${horaApertura}${horaCierre ? ' - '+horaCierre : ''}</div>
           </td>
-          <td>$${Number(c.aperturaMonto).toLocaleString('es-AR')}</td>
+          <td>
+            <div>$${Number(c.aperturaMonto).toLocaleString('es-AR')}</div>
+            ${difApertura ? `<div style="font-size:9px;color:#a13a3a;font-weight:700;">${difAperturaTxt}</div>` : ""}
+          </td>
           <td>${c.cerradaEn ? '$'+Number(c.montoContado).toLocaleString('es-AR') : '—'}</td>
           <td style="${difStyle}">${difTxt}</td>
           <td class="editcol"><button class="editbtn" title="Editar" onclick="abrirEdicionCaja('${d.id}')">&#9998;</button></td>
