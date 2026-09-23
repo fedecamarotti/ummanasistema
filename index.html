@@ -1384,22 +1384,26 @@ function renderTabla(){
    CAJA: APERTURA / CIERRE
    ===================================================================== */
 
+// Neto en efectivo (ingresos - egresos) que impacta en la caja física para un movimiento.
+function netoEfectivoMovimiento(m){
+  if(m.moneda !== "$") return 0;
+  const esGasto = esEgreso(m.prof, m.concepto);
+  let neto = 0;
+  pagosDe(m).filter(p=>p.medio==="efectivo").forEach(p=>{
+    // Si lo cobró el profesional directamente, esa plata nunca entró a nuestra caja física.
+    if(!esGasto && p.cobradoPor === "profesional") return;
+    neto += esGasto ? -p.valor : p.valor;
+  });
+  return neto;
+}
+async function netoEfectivoDelDia(fecha){
+  const snap = await db.collection('movimientos').where('fechaISO','==', fecha).get();
+  return snap.docs.reduce((acc,d)=> acc + netoEfectivoMovimiento(d.data()), 0);
+}
 async function calcularEsperadoCaja(fechaOverride){
   if(!cajaActual) return 0;
   const fecha = fechaOverride || cajaActual.fechaISO;
-  let ingresos = 0, egresos = 0;
-  const snap = await db.collection('movimientos').where('fechaISO','==', fecha).get();
-  snap.docs.forEach(d=>{
-    const m = d.data();
-    if(m.moneda !== "$") return;
-    const esGasto = esEgreso(m.prof, m.concepto);
-    pagosDe(m).filter(p=>p.medio==="efectivo").forEach(p=>{
-      // Si lo cobró el profesional directamente, esa plata nunca entró a nuestra caja física.
-      if(!esGasto && p.cobradoPor === "profesional") return;
-      if(esGasto) egresos += p.valor; else ingresos += p.valor;
-    });
-  });
-  return cajaActual.aperturaMonto + ingresos - egresos;
+  return cajaActual.aperturaMonto + await netoEfectivoDelDia(fecha);
 }
 
 function actualizarEstadoCaja(){
@@ -2671,25 +2675,73 @@ async function cargarCajas(){
   const cont = document.getElementById('cajasLista');
   cont.innerHTML = '<div class="empty-state">Cargando…</div>';
   try{
-    const snap = await db.collection('cajaSesiones')
-      .where('fechaISO','>=', mesCajasInicioISO())
-      .where('fechaISO','<', mesCajasFinISO())
-      .orderBy('fechaISO','asc')
-      .orderBy('abiertaEn','asc')
-      .get();
+    const inicio = mesCajasInicioISO(), fin = mesCajasFinISO();
+    const [snap, snapMovs, snapPrev] = await Promise.all([
+      db.collection('cajaSesiones')
+        .where('fechaISO','>=', inicio)
+        .where('fechaISO','<', fin)
+        .orderBy('fechaISO','asc')
+        .orderBy('abiertaEn','asc')
+        .get(),
+      // Movimientos del mes, para recalcular lo esperado de cada caja
+      db.collection('movimientos')
+        .where('fechaISO','>=', inicio)
+        .where('fechaISO','<', fin)
+        .get(),
+      // Cajas anteriores al mes, para comparar la primera apertura con el último cierre previo
+      db.collection('cajaSesiones')
+        .where('fechaISO','<', inicio)
+        .orderBy('fechaISO','desc')
+        .limit(10)
+        .get(),
+    ]);
     if(snap.empty){ cont.innerHTML = '<div class="empty-state">No hay aperturas registradas este mes.</div>'; return; }
+
+    // Neto en efectivo por día
+    const netoPorFecha = {};
+    snapMovs.docs.forEach(d=>{
+      const m = d.data();
+      netoPorFecha[m.fechaISO] = (netoPorFecha[m.fechaISO]||0) + netoEfectivoMovimiento(m);
+    });
+
+    // Último cierre anterior al mes (ordenado por fecha y hora de apertura)
+    const tsMs = ts => ts && ts.toMillis ? ts.toMillis() : 0;
+    const previas = snapPrev.docs.map(d=>d.data())
+      .filter(c=>c.cerradaEn && c.montoContado!=null)
+      .sort((a,b)=> a.fechaISO===b.fechaISO ? tsMs(b.abiertaEn)-tsMs(a.abiertaEn) : (a.fechaISO<b.fechaISO?1:-1));
+    let cierreAnterior = previas.length ? Number(previas[0].montoContado) : null;
+
+    const fmtDif = v => `${v>0?'+':'-'}$${Math.abs(v).toLocaleString('es-AR')}`;
+    const rojo = 'color:#a13a3a;font-weight:700;';
+
     cajasCache = {};
     const filas = snap.docs.map(d=>{
       const c = d.data();
-      cajasCache[d.id] = c;
+      const apertura = Number(c.aperturaMonto)||0;
+      const cerrada = !!c.cerradaEn && c.montoContado!=null;
+
+      // Diferencia de apertura: vs. el cierre de la caja anterior
+      const difApertura = cierreAnterior!==null ? apertura - cierreAnterior : 0;
+
+      // Diferencia de cierre: contado vs. (apertura + neto en efectivo del día)
+      const esperado = apertura + (netoPorFecha[c.fechaISO]||0);
+      const difCierre = cerrada ? Number(c.montoContado) - esperado : 0;
+
+      cajasCache[d.id] = {...c, _cierreAnterior: cierreAnterior};
+      if(cerrada) cierreAnterior = Number(c.montoContado);
+
       const horaApertura = c.abiertaEn ? c.abiertaEn.toDate().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : "—";
       const horaCierre = c.cerradaEn ? c.cerradaEn.toDate().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : "";
-      const diferencia = c.diferencia;
-      const difTxt = (!c.cerradaEn) ? "—"
-        : (!diferencia ? "$0" : `${diferencia>0?'+':'-'}$${Math.abs(diferencia).toLocaleString('es-AR')}`);
-      const difStyle = (c.cerradaEn && diferencia) ? 'color:#a13a3a;font-weight:700;' : 'color:var(--muted);';
-      const difApertura = c.diferenciaApertura;
-      const difAperturaTxt = difApertura ? `${difApertura>0?'+':'-'}$${Math.abs(difApertura).toLocaleString('es-AR')} vs. cierre anterior` : "";
+
+      let difHTML;
+      if(!difApertura && !difCierre){
+        difHTML = `<span style="color:var(--muted);">${cerrada ? '$0' : '—'}</span>`;
+      } else {
+        difHTML = '';
+        if(difApertura) difHTML += `<div style="${rojo}">${fmtDif(difApertura)}</div><div style="font-size:9px;color:#a13a3a;">en la apertura</div>`;
+        if(difCierre)   difHTML += `<div style="${rojo}">${fmtDif(difCierre)}</div><div style="font-size:9px;color:#a13a3a;">en el cierre</div>`;
+      }
+
       return `
         <tr>
           <td class="left">${c.recepcionista||''}</td>
@@ -2697,12 +2749,9 @@ async function cargarCajas(){
             <div>${isoToDisplay(c.fechaISO)}</div>
             <div style="font-size:9.5px;color:var(--muted);font-weight:400;">${horaApertura}${horaCierre ? ' - '+horaCierre : ''}</div>
           </td>
-          <td>
-            <div>$${Number(c.aperturaMonto).toLocaleString('es-AR')}</div>
-            ${difApertura ? `<div style="font-size:9px;color:#a13a3a;font-weight:700;">${difAperturaTxt}</div>` : ""}
-          </td>
-          <td>${c.cerradaEn ? '$'+Number(c.montoContado).toLocaleString('es-AR') : '—'}</td>
-          <td style="${difStyle}">${difTxt}</td>
+          <td>$${apertura.toLocaleString('es-AR')}</td>
+          <td>${cerrada ? '$'+Number(c.montoContado).toLocaleString('es-AR') : '—'}</td>
+          <td>${difHTML}</td>
           <td class="editcol"><button class="editbtn" title="Editar" onclick="abrirEdicionCaja('${d.id}')">&#9998;</button></td>
         </tr>
       `;
@@ -2756,16 +2805,17 @@ document.getElementById('guardarEditarCaja').onclick = async ()=>{
     recepcionista: nombre, cerradaPor: nombre, fechaISO,
     aperturaMonto: Number(aperturaTxt),
   };
-  if(cierreTxt){
-    cambios.montoContado = Number(cierreTxt);
-    if(c.esperadoCierre != null){
-      cambios.diferencia = cambios.montoContado - c.esperadoCierre;
-    }
-  }
 
   const btn = document.getElementById('guardarEditarCaja');
   btn.disabled = true; btn.textContent = "Guardando…";
   try{
+    // Se recalcula con los valores editados para que lo guardado quede consistente
+    cambios.diferenciaApertura = c._cierreAnterior!=null ? cambios.aperturaMonto - c._cierreAnterior : 0;
+    if(cierreTxt){
+      cambios.montoContado = Number(cierreTxt);
+      cambios.esperadoCierre = cambios.aperturaMonto + await netoEfectivoDelDia(fechaISO);
+      cambios.diferencia = cambios.montoContado - cambios.esperadoCierre;
+    }
     await db.collection('cajaSesiones').doc(editandoCajaId).update(cambios);
     overlayEditarCaja.classList.remove('show');
     cargarCajas();
