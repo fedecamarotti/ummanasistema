@@ -77,7 +77,7 @@
   .layout{display:flex;align-items:flex-start;}
 
   /* ---------- Menú desplegable (reemplaza al sidebar) ---------- */
-  .topbar{position:relative;z-index:60;}
+  .topbar{position:relative;z-index:45;} /* arriba del cartel de apertura (40), abajo de los modales (50) */
   .menu-wrap{position:relative;}
   #btnMenu{display:inline-flex;align-items:center;gap:9px;position:relative;}
   .menu-icon{position:relative;width:14px;height:10px;display:inline-block;}
@@ -199,8 +199,11 @@
   td.total.egreso{color:#a13a3a;}
   tbody tr:hover td{filter:brightness(0.98);}
   /* Tabla principal: columnas fijas, el texto largo baja de renglón en vez de ensanchar la columna */
+  .fecha-bloqueada{background:#f1ece0 !important;color:var(--muted) !important;cursor:not-allowed;}
   .tabla-mov{table-layout:fixed;width:100%;min-width:1180px;}
-  .tabla-mov td{white-space:normal;overflow-wrap:break-word;padding-top:6px;padding-bottom:6px;}
+  .tabla-mov td{white-space:normal;overflow-wrap:break-word;padding-top:2px;padding-bottom:2px;line-height:1.15;}
+  .tabla-mov .badge{padding:1px 7px;}
+  .tabla-mov .editbtn{padding:3px 6px;}
   .tabla-mov td.notas{width:auto;max-width:none;overflow:visible;text-overflow:clip;white-space:normal;}
   .tabla-mov td.concepto{white-space:normal;}
   .tabla-mov .badge{white-space:nowrap;}
@@ -1887,6 +1890,7 @@ function abrirEdicion(id){
   selPaciente.value = m.pac;
   document.getElementById('inpDestinatario').value = m.pac;
   document.getElementById('inpFechaMovimiento').value = m.fechaISO;
+  bloquearFechaMovimiento(true);
   selProfesional.value = m.prof;
   actualizarConceptosDesdeProfesional();
   selConcepto.value = m.concepto;
@@ -1911,8 +1915,28 @@ window.abrirEdicion = abrirEdicion;
 document.getElementById('closeModal').onclick = cerrarModal;
 document.getElementById('cancelMov').onclick = cerrarModal;
 function cerrarModal(){ overlay.classList.remove('show'); resetModal(); }
+const MSG_FECHA_NO_EDITABLE = "La fecha no se puede editar. En caso de querer editar la fecha, elimine el movimiento y vuelva a cargarlo en la fecha correspondiente.";
+function bloquearFechaMovimiento(bloquear){
+  const inp = document.getElementById('inpFechaMovimiento');
+  inp.readOnly = bloquear;
+  inp.classList.toggle('fecha-bloqueada', bloquear);
+  inp.title = bloquear ? "La fecha no se puede editar" : "";
+}
+(function(){
+  const inp = document.getElementById('inpFechaMovimiento');
+  const avisar = (e)=>{
+    if(!inp.readOnly) return;
+    if(e.type==='keydown' && ['Tab','Shift'].includes(e.key)) return;
+    e.preventDefault();
+    inp.blur();
+    alert(MSG_FECHA_NO_EDITABLE);
+  };
+  inp.addEventListener('mousedown', avisar);
+  inp.addEventListener('keydown', avisar);
+})();
 function resetModal(){
   montoAutoSync = null;
+  bloquearFechaMovimiento(false);
   document.getElementById('inpFechaMovimiento').value = hoyISO();
   selPaciente.value = "";
   document.getElementById('inpDestinatario').value = "";
@@ -2081,7 +2105,6 @@ btnGuardarMov.onclick = async ()=>{
   if(modo==='editar'){
     if(!confirm("¿Está seguro de editar este registro? Esta opción no tiene vuelta atrás.")) return;
     const cambios = {
-      fechaISO, fechaDisplay,
       pac: pacValor, prof: selProfesional.value, concepto: selConcepto.value, codigo,
       notas: document.getElementById('inpNotas').value, moneda: monedaSel, valor: valorNum,
       pagos, tieneDeudaPendiente: pendienteDeuda,
