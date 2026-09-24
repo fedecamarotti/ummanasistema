@@ -415,15 +415,15 @@
           <button class="menu-close" id="menuClose" title="Cerrar" aria-label="Cerrar menú">✕</button>
         </div>
         <div class="menu-links" id="sidebarLinks">
-          <button class="btn col-hidden" id="btnCajas"><span class="side-icon">🗄</span> Cajas</button>
-          <button class="btn" id="btnPacientes"><span class="side-icon">🧑</span> Pacientes</button>
-          <button class="btn col-hidden" id="btnProfesionalesPanel"><span class="side-icon">🩺</span> Profesionales/Áreas</button>
+          <button class="btn col-hidden" id="btnCajas"><span class="side-icon">🗳️</span> Cajas</button>
+          <button class="btn" id="btnPacientes"><span class="side-icon">🌱</span> Pacientes</button>
+          <button class="btn col-hidden" id="btnProfesionalesPanel"><span class="side-icon">👩🏻‍⚕️</span> Profesionales/Áreas</button>
           <button class="btn col-hidden" id="btnConceptosPanel"><span class="side-icon">📋</span> Conceptos</button>
-          <button class="btn col-hidden" id="btnProveedoresPanel"><span class="side-icon">🏷</span> Proveedores</button>
-          <button class="btn btn-deudores" id="btnDeudores"><span class="side-icon">💰</span> Deudores <span class="badge-count col-hidden" id="deudoresCount">0</span></button>
+          <button class="btn col-hidden" id="btnProveedoresPanel"><span class="side-icon">👨🏻‍💼</span> Proveedores</button>
+          <button class="btn btn-deudores" id="btnDeudores"><span class="side-icon">🕵🏻‍♂️</span> Deudores <span class="badge-count col-hidden" id="deudoresCount">0</span></button>
           <button class="btn col-hidden" id="btnInformes"><span class="side-icon">📊</span> Informes</button>
           <button class="btn" id="btnReporteDiario"><span class="side-icon">🧾</span> Reporte diario</button>
-          <button class="btn" id="btnPagoProfesional"><span class="side-icon">💵</span> Calcular pago profesional</button>
+          <button class="btn" id="btnPagoProfesional"><span class="side-icon">🧮</span> Calcular pago profesional</button>
           <button class="btn col-hidden" id="btnImportar"><span class="side-icon">⬆</span> Importar catálogo</button>
         </div>
       </div>
@@ -1273,13 +1273,18 @@ document.getElementById('mesNext').onclick = ()=>{
 };
 actualizarMesLabel();
 
+// "Importar catálogo" es exclusivo del usuario de Fede (ni otros admins lo ven)
+function esFede(){
+  if(!currentUser || currentUser.rol !== 'admin') return false;
+  return /^fede(rico)?\b/i.test((currentUser.nombre||'').trim());
+}
 function aplicarRolUI(){
   const esAdmin = currentUser.rol === 'admin';
   document.getElementById('btnCierre').classList.toggle('col-hidden', esAdmin);
   document.getElementById('cajaStatus').classList.toggle('col-hidden', esAdmin);
   document.getElementById('cajaHint').classList.toggle('col-hidden', esAdmin);
   document.getElementById('btnInformes').classList.toggle('col-hidden', !esAdmin);
-  document.getElementById('btnImportar').classList.toggle('col-hidden', !esAdmin);
+  document.getElementById('btnImportar').classList.toggle('col-hidden', !esFede());
   document.getElementById('btnCajas').classList.toggle('col-hidden', !esAdmin);
   document.getElementById('btnProfesionalesPanel').classList.toggle('col-hidden', !esAdmin);
   document.getElementById('btnConceptosPanel').classList.toggle('col-hidden', !esAdmin);
@@ -2647,6 +2652,7 @@ document.getElementById('btnGenerarInforme').onclick = async ()=>{
    ===================================================================== */
 const overlayImportar = document.getElementById('overlayImportar');
 document.getElementById('btnImportar').onclick = ()=>{
+  if(!esFede()) return;
   document.getElementById('impPacientesInfo').textContent = "";
   document.getElementById('impPacientesFile').value = "";
   document.getElementById('impPacientesBtn').disabled = true;
