@@ -1233,6 +1233,17 @@ function toggleVistaPrevia(){
 document.getElementById('btnVistaPrevia').onclick = toggleVistaPrevia;
 document.getElementById('btnVistaPreviaGate').onclick = toggleVistaPrevia;
 
+// Mientras se guarda una fila de un panel, no se redibuja la lista desde Firestore:
+// si no, la fila se reemplaza en medio del guardado (se pierde el "¡Guardado!", el
+// scroll salta y se borran cambios sin guardar de otras filas).
+let pausaRenderPaneles = 0;
+function conPausaRender(fn){
+  return async function(...args){
+    pausaRenderPaneles++;
+    try{ return await fn.apply(this, args); }
+    finally{ setTimeout(()=>{ pausaRenderPaneles = Math.max(0, pausaRenderPaneles-1); }, 600); }
+  };
+}
 let unsubMovimientos = null, unsubPacientes = null, unsubCajaAbierta = null, unsubHoy = null, unsubDeuda = null, unsubConceptos = null, unsubProfesionales = null, unsubProveedores = null;
 let profesionalesFullList = [];
 let proveedoresFullList = [];
@@ -1337,7 +1348,7 @@ function iniciarListeners(){
   unsubPacientes = db.collection('pacientes').orderBy('apellido').onSnapshot(snap=>{
     pacientesFullList = snap.docs.map(d=> ({id:d.id, ...d.data()}));
     pacienteRegistry = pacientesFullList.map(p=> p.nombreCompleto);
-    if(overlayPacientes.classList.contains('show')) renderPacientesBusqueda();
+    if(!pausaRenderPaneles && overlayPacientes.classList.contains('show')) renderPacientesBusqueda();
   });
 
   // Catálogo de profesionales/conceptos (con su código)
@@ -1355,21 +1366,21 @@ function iniciarListeners(){
     poblarProfesionalesUI();
     actualizarCampoPacienteSegunTipo();
     renderTabla();
-    if(overlayConceptos.classList.contains('show')) renderConceptosBusqueda();
+    if(!pausaRenderPaneles && overlayConceptos.classList.contains('show')) renderConceptosBusqueda();
   });
 
   // Tipo (ingreso/egreso) de cada profesional/área
   unsubProfesionales = db.collection('profesionales').onSnapshot(snap=>{
     profesionalesFullList = snap.docs.map(d=> ({id:d.id, ...d.data()}));
-    if(overlayProfesionalesPanel.classList.contains('show')) renderProfesionalesBusqueda();
-    if(overlayConceptos.classList.contains('show')) renderConceptosBusqueda();
+    if(!pausaRenderPaneles && overlayProfesionalesPanel.classList.contains('show')) renderProfesionalesBusqueda();
+    if(!pausaRenderPaneles && overlayConceptos.classList.contains('show')) renderConceptosBusqueda();
   });
 
   // Proveedores/destinatarios de gastos
   unsubProveedores = db.collection('proveedores').orderBy('nombre').onSnapshot(snap=>{
     proveedoresFullList = snap.docs.map(d=> ({id:d.id, ...d.data()}));
     proveedoresRegistry = proveedoresFullList.map(p=> p.nombre);
-    if(overlayProveedores.classList.contains('show')) renderProveedoresBusqueda();
+    if(!pausaRenderPaneles && overlayProveedores.classList.contains('show')) renderProveedoresBusqueda();
   });
 
   // Movimientos del mes elegido (por defecto, el mes en curso)
@@ -3240,7 +3251,7 @@ async function guardarPacienteCard(id, btn){
     btn.disabled = false; btn.textContent = txtOriginal;
   }
 }
-window.guardarPacienteCard = guardarPacienteCard;
+window.guardarPacienteCard = conPausaRender(guardarPacienteCard);
 
 async function eliminarPacienteFila(id, btn){
   if(!confirm("¿Eliminar este paciente? Esta acción no se puede deshacer. No borra los movimientos ya cargados con su nombre.")) return;
@@ -3324,7 +3335,7 @@ async function guardarProveedorFila(id, btn){
     btn.disabled = false; btn.textContent = txtOriginal;
   }
 }
-window.guardarProveedorFila = guardarProveedorFila;
+window.guardarProveedorFila = conPausaRender(guardarProveedorFila);
 
 async function eliminarProveedorFila(id, btn){
   if(!confirm("¿Eliminar este proveedor/destinatario? Esta acción no se puede deshacer.")) return;
@@ -3452,7 +3463,8 @@ async function guardarProfesionalFila(btn){
     if(id){
       await db.collection('profesionales').doc(id).update({nombre, telefono});
     } else {
-      await db.collection('profesionales').add({nombre, telefono});
+      const ref = await db.collection('profesionales').add({nombre, telefono});
+      fila.dataset.id = ref.id;
     }
     btn.textContent = "¡Guardado!";
     setTimeout(()=>{ btn.textContent = txtOriginal; btn.disabled = false; }, 1200);
@@ -3461,7 +3473,7 @@ async function guardarProfesionalFila(btn){
     btn.disabled = false; btn.textContent = txtOriginal;
   }
 }
-window.guardarProfesionalFila = guardarProfesionalFila;
+window.guardarProfesionalFila = conPausaRender(guardarProfesionalFila);
 
 async function eliminarProfesionalFila(id, nombre, btn){
   const cantidadConceptos = (CONCEPTOS[nombre]||[]).length;
@@ -3621,6 +3633,8 @@ async function guardarConceptoFila(btn){
       .limit(1).get();
     if(snap.empty){ throw new Error("No encontré el concepto original en la base."); }
     await snap.docs[0].ref.update({profesional, concepto, codigo, tipo});
+    fila.dataset.profesionalOriginal = profesional;
+    fila.dataset.conceptoOriginal = concepto;
     btn.textContent = "¡Guardado!";
     setTimeout(()=>{ btn.textContent = txtOriginal; btn.disabled = false; }, 1200);
   }catch(e){
@@ -3628,7 +3642,7 @@ async function guardarConceptoFila(btn){
     btn.disabled = false; btn.textContent = txtOriginal;
   }
 }
-window.guardarConceptoFila = guardarConceptoFila;
+window.guardarConceptoFila = conPausaRender(guardarConceptoFila);
 
 async function eliminarConceptoFila(btn){
   const fila = btn.closest('.fila-editable');
