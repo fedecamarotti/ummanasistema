@@ -75,26 +75,81 @@
   .actions{display:flex;gap:10px;flex-wrap:wrap;}
 
   .layout{display:flex;align-items:flex-start;}
-  .sidebar{
-    width:230px;flex:none;background:#fffcf5;border-right:1px solid var(--border);
-    padding:16px 10px;transition:width 0.18s ease, padding 0.18s ease;overflow:hidden;
-    min-height:calc(100vh - 65px);
+
+  /* ---------- Menú desplegable (reemplaza al sidebar) ---------- */
+  .topbar{position:relative;z-index:60;}
+  .menu-wrap{position:relative;}
+  #btnMenu{display:inline-flex;align-items:center;gap:9px;position:relative;}
+  .menu-icon{position:relative;width:14px;height:10px;display:inline-block;}
+  .menu-icon i{
+    position:absolute;left:0;width:100%;height:1.6px;border-radius:2px;background:currentColor;
+    transition:transform .32s cubic-bezier(.2,.8,.2,1), opacity .2s ease, top .32s cubic-bezier(.2,.8,.2,1);
   }
-  .sidebar.collapsed{width:44px;padding:16px 6px;}
-  .sidebar.collapsed .sidebar-links button{display:none;}
-  .sidebar-toggle{
-    border:none;background:#f0e8cf;width:32px;height:32px;border-radius:8px;
-    font-size:14px;margin-bottom:14px;color:var(--text);
+  .menu-icon i:nth-child(1){top:0;}
+  .menu-icon i:nth-child(2){top:4.2px;}
+  .menu-icon i:nth-child(3){top:8.4px;}
+  #btnMenu[aria-expanded="true"]{background:#f0e8cf;}
+  #btnMenu[aria-expanded="true"] .menu-icon i:nth-child(1){top:4.2px;transform:rotate(45deg);}
+  #btnMenu[aria-expanded="true"] .menu-icon i:nth-child(2){opacity:0;transform:scaleX(0);}
+  #btnMenu[aria-expanded="true"] .menu-icon i:nth-child(3){top:4.2px;transform:rotate(-45deg);}
+  .menu-dot{
+    position:absolute;top:-4px;right:-4px;width:9px;height:9px;border-radius:50%;
+    background:#e53935;border:2px solid #fffcf5;
   }
-  .sidebar-toggle:hover{background:#e6dcc0;}
-  .sidebar-links{display:flex;flex-direction:column;gap:4px;}
-  .sidebar-links button{
-    text-align:left;width:100%;white-space:nowrap;border:none;background:transparent;
-    padding:10px 12px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--text);
+  .menu-dropdown{
+    position:absolute;top:calc(100% + 10px);left:0;width:270px;
+    background:#fffcf5;border:1px solid var(--border);border-radius:14px;
+    box-shadow:0 18px 44px rgba(58,47,28,0.16), 0 2px 6px rgba(58,47,28,0.06);
+    padding:8px;transform-origin:top left;
+    opacity:0;visibility:hidden;pointer-events:none;
+    transform:translateY(-6px) scale(.97);
+    clip-path:inset(0 0 100% 0 round 14px);
+    transition:opacity .22s ease, transform .34s cubic-bezier(.2,.8,.2,1), clip-path .38s cubic-bezier(.2,.8,.2,1), visibility 0s linear .38s;
   }
-  .sidebar-links button:hover{background:#f0e8cf;}
-  .sidebar-links .btn-deudores{background:transparent;position:relative;}
+  .menu-dropdown.open{
+    opacity:1;visibility:visible;pointer-events:auto;
+    transform:none;clip-path:inset(0 0 0 0 round 14px);
+    transition:opacity .18s ease, transform .34s cubic-bezier(.2,.8,.2,1), clip-path .38s cubic-bezier(.2,.8,.2,1), visibility 0s;
+  }
+  .menu-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:6px 6px 8px 10px;margin-bottom:4px;border-bottom:1px solid var(--border);
+  }
+  .menu-head span{font-size:12px;font-weight:700;color:var(--muted);}
+  .menu-close{
+    border:none;background:transparent;width:28px;height:28px;border-radius:8px;
+    font-size:14px;color:var(--muted);display:grid;place-items:center;
+  }
+  .menu-close:hover{background:#f0e8cf;color:var(--text);}
+  .menu-links{display:flex;flex-direction:column;gap:2px;}
+  .menu-links button{
+    display:flex;align-items:center;gap:10px;text-align:left;width:100%;white-space:nowrap;
+    border:none;background:transparent;padding:10px 10px;border-radius:9px;
+    font-size:12.5px;font-weight:600;color:var(--text);
+    opacity:0;transform:translateY(-4px);
+    transition:background .15s ease, opacity .2s ease, transform .28s cubic-bezier(.2,.8,.2,1);
+  }
+  .menu-links button.col-hidden{display:none;}
+  .menu-dropdown.open .menu-links button{opacity:1;transform:none;transition-delay:calc(var(--i,0) * 28ms + 60ms), calc(var(--i,0) * 28ms + 60ms), calc(var(--i,0) * 28ms + 60ms);}
+  .menu-dropdown.open .menu-links button:hover{background:#f0e8cf;transition-delay:0s;}
+  .menu-links button:focus-visible, #btnMenu:focus-visible, .menu-close:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+  .menu-links .badge-count{position:static;margin-left:auto;}
   .side-icon{display:inline-block;width:18px;text-align:center;}
+  @media (max-width:640px){
+    .menu-dropdown{left:auto;right:0;transform-origin:top right;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .menu-dropdown, .menu-dropdown.open, .menu-links button, .menu-icon i{transition:none !important;}
+    .menu-dropdown{clip-path:none;}
+  }
+
+  /* ---------- Vista previa (solo lectura) ---------- */
+  body.modo-lectura #tbody .editbtn{visibility:hidden;}
+  .preview-banner{
+    display:inline-flex;align-items:center;gap:8px;margin:8px 28px 0;padding:6px 12px;
+    background:#eef1ff;border:1px solid #d9dcff;color:#4842c9;border-radius:20px;
+    font-size:11.5px;font-weight:600;
+  }
   .main-area{flex:1;min-width:0;}
   .btn{
     border:1px solid var(--border);background:#fffcf5;padding:8px 16px;border-radius:7px;
@@ -241,14 +296,16 @@
   .panel-container{position:relative;min-height:calc(100vh - 220px);}
   .panel-blur{filter:blur(6px);pointer-events:none;user-select:none;}
   .panel-gate{
-    position:absolute;inset:0;display:none;align-items:center;justify-content:center;
-    z-index:40;padding:20px;
+    position:absolute;inset:0;display:none;align-items:flex-start;justify-content:center;
+    z-index:40;padding:70px 20px 20px;
   }
   .panel-gate.show{display:flex;}
   .gate-card{
     background:#fffcf5;border:1px solid var(--border);border-radius:16px;padding:30px 34px;
-    text-align:center;box-shadow:0 16px 46px rgba(20,20,30,0.16);max-width:320px;
+    text-align:center;box-shadow:0 16px 46px rgba(20,20,30,0.16);max-width:340px;
+    position:sticky;top:90px;
   }
+  .gate-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
   .gate-card h2{margin:0 0 8px;font-size:16px;font-weight:700;}
   .gate-card p{margin:0 0 18px;font-size:12px;color:var(--muted);line-height:1.5;}
   .gate-card .btn-primary{padding:10px 22px;}
@@ -336,30 +393,40 @@
   </div>
   <div class="actions">
     <button class="btn col-hidden" id="btnCierre">Cerrar caja</button>
+    <button class="btn col-hidden" id="btnVistaPrevia">Vista previa</button>
+    <div class="menu-wrap" id="menuWrap">
+      <button class="btn" id="btnMenu" aria-haspopup="true" aria-expanded="false" aria-controls="menuDropdown">
+        <span class="menu-icon" aria-hidden="true"><i></i><i></i><i></i></span> Menú
+        <span class="menu-dot col-hidden" id="menuDot"></span>
+      </button>
+      <div class="menu-dropdown" id="menuDropdown" role="menu">
+        <div class="menu-head">
+          <span>Menú</span>
+          <button class="menu-close" id="menuClose" title="Cerrar" aria-label="Cerrar menú">✕</button>
+        </div>
+        <div class="menu-links" id="sidebarLinks">
+          <button class="btn col-hidden" id="btnCajas"><span class="side-icon">🗄</span> Cajas</button>
+          <button class="btn" id="btnPacientes"><span class="side-icon">🧑</span> Pacientes</button>
+          <button class="btn col-hidden" id="btnProfesionalesPanel"><span class="side-icon">🩺</span> Profesionales/Áreas</button>
+          <button class="btn col-hidden" id="btnConceptosPanel"><span class="side-icon">📋</span> Conceptos</button>
+          <button class="btn col-hidden" id="btnProveedoresPanel"><span class="side-icon">🏷</span> Proveedores</button>
+          <button class="btn btn-deudores" id="btnDeudores"><span class="side-icon">💰</span> Deudores <span class="badge-count col-hidden" id="deudoresCount">0</span></button>
+          <button class="btn col-hidden" id="btnInformes"><span class="side-icon">📊</span> Informes</button>
+          <button class="btn" id="btnReporteDiario"><span class="side-icon">🧾</span> Reporte diario</button>
+          <button class="btn" id="btnPagoProfesional"><span class="side-icon">💵</span> Calcular pago profesional</button>
+          <button class="btn col-hidden" id="btnImportar"><span class="side-icon">⬆</span> Importar catálogo</button>
+        </div>
+      </div>
+    </div>
     <button class="btn btn-primary" id="btnNuevo">+ Nuevo movimiento</button>
     <button class="btn" id="btnLogout">Salir</button>
   </div>
 </div>
 
 <div class="layout">
-  <div class="sidebar" id="sidebarNav">
-    <button class="sidebar-toggle" id="sidebarToggle" title="Contraer/expandir">☰</button>
-    <div class="sidebar-links" id="sidebarLinks">
-      <button class="btn col-hidden" id="btnCajas"><span class="side-icon">🗄</span> Cajas</button>
-      <button class="btn" id="btnPacientes"><span class="side-icon">🧑</span> Pacientes</button>
-      <button class="btn col-hidden" id="btnProfesionalesPanel"><span class="side-icon">🩺</span> Profesionales/Áreas</button>
-      <button class="btn col-hidden" id="btnConceptosPanel"><span class="side-icon">📋</span> Conceptos</button>
-      <button class="btn col-hidden" id="btnProveedoresPanel"><span class="side-icon">🏷</span> Proveedores</button>
-      <button class="btn btn-deudores" id="btnDeudores"><span class="side-icon">💰</span> Deudores <span class="badge-count col-hidden" id="deudoresCount">0</span></button>
-      <button class="btn col-hidden" id="btnInformes"><span class="side-icon">📊</span> Informes</button>
-      <button class="btn" id="btnReporteDiario"><span class="side-icon">🧾</span> Reporte diario</button>
-      <button class="btn" id="btnPagoProfesional"><span class="side-icon">💵</span> Calcular pago profesional</button>
-      <button class="btn col-hidden" id="btnImportar"><span class="side-icon">⬆</span> Importar catálogo</button>
-    </div>
-  </div>
-
   <div class="main-area">
     <div class="hint" id="cajaHint"></div>
+    <div class="preview-banner col-hidden" id="previewBanner">👁 Vista previa: solo lectura</div>
     <div class="mes-selector">
       <button id="mesPrev" title="Mes anterior">◀</button>
       <span id="mesLabel"></span>
@@ -393,7 +460,10 @@
         <div class="gate-card">
           <h2>Apertura de caja</h2>
           <p>Abrí la caja con el monto inicial en efectivo para empezar a cargar movimientos.</p>
-          <button class="btn btn-primary" id="btnAbrirDesdeGate">Abrir caja</button>
+          <div class="gate-actions">
+            <button class="btn btn-primary" id="btnAbrirDesdeGate">Abrir caja</button>
+            <button class="btn" id="btnVistaPreviaGate">Vista previa</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1079,9 +1149,46 @@ function intentarLogin(){
   });
 }
 document.getElementById('btnLogout').onclick = ()=> auth.signOut();
-document.getElementById('sidebarToggle').onclick = ()=>{
-  document.getElementById('sidebarNav').classList.toggle('collapsed');
+/* ---------- Menú desplegable ---------- */
+const btnMenu = document.getElementById('btnMenu');
+const menuDropdown = document.getElementById('menuDropdown');
+function abrirMenu(){
+  menuDropdown.classList.add('open');
+  btnMenu.setAttribute('aria-expanded','true');
+  // índice para la animación escalonada (solo ítems visibles)
+  [...menuDropdown.querySelectorAll('.menu-links button')]
+    .filter(b=>!b.classList.contains('col-hidden'))
+    .forEach((b,i)=> b.style.setProperty('--i', i));
+}
+function cerrarMenu(){
+  menuDropdown.classList.remove('open');
+  btnMenu.setAttribute('aria-expanded','false');
+}
+btnMenu.onclick = (e)=>{
+  e.stopPropagation();
+  menuDropdown.classList.contains('open') ? cerrarMenu() : abrirMenu();
 };
+document.getElementById('menuClose').onclick = (e)=>{ e.stopPropagation(); cerrarMenu(); btnMenu.focus(); };
+document.addEventListener('click', (e)=>{
+  if(menuDropdown.classList.contains('open') && !document.getElementById('menuWrap').contains(e.target)) cerrarMenu();
+});
+document.addEventListener('keydown', (e)=>{
+  if(e.key==='Escape' && menuDropdown.classList.contains('open')){ cerrarMenu(); btnMenu.focus(); }
+});
+// al elegir una opción, el menú se cierra (el handler propio de cada botón sigue funcionando)
+menuDropdown.querySelectorAll('.menu-links button').forEach(b=> b.addEventListener('click', cerrarMenu));
+
+/* ---------- Vista previa (solo lectura con la caja cerrada) ---------- */
+let vistaPrevia = false;
+function soloLectura(){
+  return !!currentUser && currentUser.rol !== 'admin' && !cajaActual;
+}
+function toggleVistaPrevia(){
+  vistaPrevia = !vistaPrevia;
+  actualizarEstadoCaja();
+}
+document.getElementById('btnVistaPrevia').onclick = toggleVistaPrevia;
+document.getElementById('btnVistaPreviaGate').onclick = toggleVistaPrevia;
 
 let unsubMovimientos = null, unsubPacientes = null, unsubCajaAbierta = null, unsubHoy = null, unsubDeuda = null, unsubConceptos = null, unsubProfesionales = null, unsubProveedores = null;
 let profesionalesFullList = [];
@@ -1429,10 +1536,16 @@ function actualizarEstadoCaja(){
   const gate = document.getElementById('panelGate');
   const content = document.getElementById('panelContent');
 
+  const btnPrev = document.getElementById('btnVistaPrevia');
+  const banner = document.getElementById('previewBanner');
+
   if(currentUser && currentUser.rol === 'admin'){
     btnNuevo.disabled = false;
     gate.classList.remove('show');
     content.classList.remove('panel-blur');
+    btnPrev.classList.add('col-hidden');
+    banner.classList.add('col-hidden');
+    document.body.classList.remove('modo-lectura');
     return;
   }
   if(cajaActual){
@@ -1445,6 +1558,10 @@ function actualizarEstadoCaja(){
     btnNuevo.disabled = false;
     gate.classList.remove('show');
     content.classList.remove('panel-blur');
+    vistaPrevia = false;
+    btnPrev.classList.add('col-hidden');
+    banner.classList.add('col-hidden');
+    document.body.classList.remove('modo-lectura');
   } else {
     el.classList.add('closed');
     el.querySelector('span').innerHTML = ultimoCierre!==null
@@ -1452,10 +1569,22 @@ function actualizarEstadoCaja(){
       : "Caja cerrada — todavía no hay ningún cierre registrado";
     btn.textContent = "Abrir caja";
     btn.disabled = false;
-    hint.textContent = "Abrí la caja para poder cargar movimientos.";
-    btnNuevo.disabled = true;
-    gate.classList.add('show');
-    content.classList.add('panel-blur');
+    btnNuevo.disabled = false; // se muestra activo; al tocarlo avisa que hay que abrir caja
+    btnPrev.classList.remove('col-hidden');
+    btnPrev.textContent = vistaPrevia ? "Salir de vista previa" : "Vista previa";
+    document.body.classList.add('modo-lectura');
+    if(vistaPrevia){
+      hint.textContent = "Podés ver los movimientos, cambiar de mes y buscar. Para cargar o editar, abrí la caja.";
+      banner.classList.remove('col-hidden');
+      gate.classList.remove('show');
+      content.classList.remove('panel-blur');
+    } else {
+      hint.textContent = "Abrí la caja para poder cargar movimientos.";
+      banner.classList.add('col-hidden');
+      gate.classList.add('show');
+      content.classList.add('panel-blur');
+      window.scrollTo({top:0});
+    }
   }
 }
 document.getElementById('btnAbrirDesdeGate').onclick = abrirModalApertura;
@@ -1718,6 +1847,7 @@ attachAutocomplete(selProfesional, ()=> todosLosNombresDeProfesionales());
 selProfesional.addEventListener('input', actualizarConceptosDesdeProfesional);
 
 document.getElementById('btnNuevo').onclick = ()=>{
+  if(soloLectura()){ alert("Para cargar movimientos hay que abrir caja."); return; }
   modo = 'nuevo'; editingId = null;
   modalTitle.textContent = "Nuevo movimiento";
   btnGuardarMov.textContent = "Guardar movimiento";
@@ -1727,6 +1857,7 @@ document.getElementById('btnNuevo').onclick = ()=>{
 };
 
 function abrirEdicion(id){
+  if(soloLectura()){ alert("Para editar movimientos hay que abrir caja."); return; }
   const m = movimientos.find(x=>x.id===id);
   if(!m) return;
   modo = 'editar'; editingId = id;
@@ -1986,6 +2117,7 @@ function renderDeudoresCount(){
   const badge = document.getElementById('deudoresCount');
   if(pendientes.length){ badge.textContent = pendientes.length; badge.classList.remove('col-hidden'); }
   else badge.classList.add('col-hidden');
+  document.getElementById('menuDot').classList.toggle('col-hidden', !pendientes.length);
 }
 function renderDeudores(){
   const pendientes = movimientosDeuda;
