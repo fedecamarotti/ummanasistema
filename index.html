@@ -304,6 +304,18 @@
   .mes-selector span{font-size:13px;font-weight:700;text-transform:capitalize;min-width:150px;text-align:center;}
 
   .panel-container{position:relative;min-height:calc(100vh - 220px);}
+
+  /* ---------- Pantalla fija: solo scrollean los movimientos ---------- */
+  #app:not(.col-hidden){height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;}
+  #app > .topbar{flex:none;}
+  #app > .layout{flex:1;min-height:0;align-items:stretch;}
+  #app .main-area{display:flex;flex-direction:column;min-height:0;}
+  #app .main-area > .hint, #app .main-area > .preview-banner, #app .main-area > .mes-selector{flex:none;}
+  #app .main-area > .preview-banner{align-self:flex-start;}
+  #panelContainer{flex:1;min-height:0;display:flex;flex-direction:column;}
+  #panelContent{flex:1;min-height:0;display:flex;flex-direction:column;}
+  #panelContent > .sheet-wrap{flex:1;min-height:0;overflow:auto;margin-bottom:20px;overscroll-behavior:contain;}
+  #panelContent > .sheet-wrap thead th{z-index:3;}
   .panel-blur{filter:blur(6px);pointer-events:none;user-select:none;}
   .panel-gate{
     position:absolute;inset:0;display:none;align-items:flex-start;justify-content:center;
@@ -1610,7 +1622,7 @@ function actualizarEstadoCaja(){
       banner.classList.add('col-hidden');
       gate.classList.add('show');
       content.classList.add('panel-blur');
-      window.scrollTo({top:0});
+      const sw = document.querySelector('#panelContent > .sheet-wrap'); if(sw) sw.scrollTop = 0;
     }
   }
 }
