@@ -1604,21 +1604,64 @@ const tsMs = ts => ts && ts.toMillis ? ts.toMillis() : null;
 
 // Un movimiento pertenece a una caja si fue cargado con esa caja abierta (cajaId).
 // Para movimientos viejos sin cajaId, se usa la hora de carga: entre la apertura y el cierre.
-function movPerteneceASesion(m, sesionId, sesion){
-  if(m.cajaId) return m.cajaId === sesionId;
-  const t = tsMs(m.creadoEn), ini = tsMs(sesion.abiertaEn), fin = tsMs(sesion.cerradaEn);
-  if(t===null || ini===null) return false;
-  return t >= ini && (fin===null || t <= fin);
+// ¿A qué caja pertenece un movimiento?
+// - Movimientos nuevos: la caja que estaba abierta al cargarlo (cajaId).
+// - Movimientos viejos (sin cajaId): una caja de la MISMA FECHA del movimiento
+//   (igual que el reporte diario). Si ese día hubo varias, la que estaba abierta
+//   cuando se cargó; si se cargó fuera de todos los horarios, la más cercana en el tiempo.
+function sesionDeMovimiento(m, sesiones){
+  if(m.cajaId) return sesiones.find(c=> c.id === m.cajaId) || null;
+  const delDia = sesiones.filter(c=> c.fechaISO === m.fechaISO && c.abiertaEn);
+  if(!delDia.length) return null;
+  if(delDia.length === 1) return delDia[0];
+  const t = tsMs(m.creadoEn);
+  if(t === null) return delDia[0];
+  let mejor = null, mejorDist = Infinity;
+  delDia.forEach(c=>{
+    const ini = tsMs(c.abiertaEn), fin = tsMs(c.cerradaEn) ?? Date.now();
+    const dist = t < ini ? ini - t : (t > fin ? t - fin : 0);
+    if(dist < mejorDist){ mejorDist = dist; mejor = c; }
+  });
+  return mejor;
+}
+// Trae los movimientos que pueden pertenecer a un conjunto de cajas:
+// los viejos por fecha y los nuevos por cajaId / hora de carga.
+async function movimientosParaSesiones(sesiones){
+  const conApertura = sesiones.filter(c=>c.abiertaEn);
+  if(!conApertura.length) return [];
+  const fechas = conApertura.map(c=>c.fechaISO).sort();
+  const desde = conApertura.reduce((a,c)=> tsMs(c.abiertaEn) < tsMs(a) ? c.abiertaEn : a, conApertura[0].abiertaEn);
+  let qNuevos = db.collection('movimientos').where('creadoEn','>=', desde);
+  if(conApertura.every(c=>c.cerradaEn)){
+    const hasta = conApertura.reduce((a,c)=> tsMs(c.cerradaEn) > tsMs(a) ? c.cerradaEn : a, conApertura[0].cerradaEn);
+    qNuevos = qNuevos.where('creadoEn','<=', hasta);
+  }
+  const [snapFecha, snapNuevos] = await Promise.all([
+    db.collection('movimientos').where('fechaISO','>=', fechas[0]).where('fechaISO','<=', fechas[fechas.length-1]).get(),
+    qNuevos.get(),
+  ]);
+  const porId = {};
+  snapFecha.docs.forEach(d=> porId[d.id] = d.data());
+  snapNuevos.docs.forEach(d=> porId[d.id] = d.data());
+  return Object.values(porId);
+}
+function netoPorSesion(movs, sesiones){
+  const neto = {};
+  movs.forEach(m=>{
+    const ses = sesionDeMovimiento(m, sesiones);
+    if(ses) neto[ses.id] = (neto[ses.id]||0) + netoEfectivoMovimiento(m);
+  });
+  return neto;
 }
 async function netoEfectivoDeSesion(sesionId, sesion){
   if(!sesion.abiertaEn) return 0;
-  let q = db.collection('movimientos').where('creadoEn','>=', sesion.abiertaEn);
-  if(sesion.cerradaEn) q = q.where('creadoEn','<=', sesion.cerradaEn);
-  const snap = await q.get();
-  return snap.docs.reduce((acc,d)=>{
-    const m = d.data();
-    return movPerteneceASesion(m, sesionId, sesion) ? acc + netoEfectivoMovimiento(m) : acc;
-  }, 0);
+  // Todas las cajas de ese día, para repartir bien los movimientos viejos
+  const snapDia = await db.collection('cajaSesiones').where('fechaISO','==', sesion.fechaISO).get();
+  const sesiones = snapDia.docs.map(d=>({id:d.id, ...d.data()}));
+  if(!sesiones.some(c=>c.id===sesionId)) sesiones.push({id:sesionId, ...sesion});
+  const movs = await movimientosParaSesiones(sesiones.filter(c=>c.id===sesionId));
+  // también los viejos de ese día que pudieran caer en esta caja
+  return netoPorSesion(movs, sesiones)[sesionId] || 0;
 }
 async function calcularEsperadoCaja(){
   if(!cajaActual) return 0;
@@ -3089,22 +3132,7 @@ async function cargarCajas(){
 
     // Movimientos cargados durante las cajas del mes, asignados a cada caja
     const sesiones = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(c=>c.abiertaEn);
-    const netoPorCaja = {};
-    if(sesiones.length){
-      const desde = sesiones.reduce((a,c)=> tsMs(c.abiertaEn) < tsMs(a) ? c.abiertaEn : a, sesiones[0].abiertaEn);
-      let qMovs = db.collection('movimientos').where('creadoEn','>=', desde);
-      // Si todas las cajas del mes están cerradas, acotamos hasta el último cierre
-      if(sesiones.every(c=>c.cerradaEn)){
-        const hasta = sesiones.reduce((a,c)=> tsMs(c.cerradaEn) > tsMs(a) ? c.cerradaEn : a, sesiones[0].cerradaEn);
-        qMovs = qMovs.where('creadoEn','<=', hasta);
-      }
-      const snapMovs = await qMovs.get();
-      snapMovs.docs.forEach(d=>{
-        const m = d.data();
-        const ses = m.cajaId ? sesiones.find(c=>c.id===m.cajaId) : sesiones.find(c=>movPerteneceASesion(m, c.id, c));
-        if(ses) netoPorCaja[ses.id] = (netoPorCaja[ses.id]||0) + netoEfectivoMovimiento(m);
-      });
-    }
+    const netoPorCaja = netoPorSesion(await movimientosParaSesiones(sesiones), sesiones);
 
     // Último cierre anterior al mes (ordenado por fecha y hora de apertura)
     const previas = snapPrev.docs.map(d=>d.data())
