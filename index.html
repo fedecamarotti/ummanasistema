@@ -1849,16 +1849,32 @@ function agregarFilaPago(monto, medio, cobradoPor){
   });
   const selMedio = row.querySelector('.pago-medio');
   const selQuien = row.querySelector('.pago-quien');
-  function sincronizarQuienSegunMedio(){
+  // Transferencia: siempre la cobra el profesional (única opción).
+  // Resto de los medios: ambas opciones, "Cobra Ummana" primero.
+  // Excepción: un movimiento viejo cargado como transferencia cobrada por Ummana
+  // conserva su valor al editarlo, para no cambiarlo sin querer.
+  const legadoTransfUmmana = medio === 'transferencia' && cobradoPor === 'ummana';
+  function opcionesQuien(soloProfesional, valor){
+    selQuien.innerHTML = soloProfesional
+      ? `<option value="profesional">Cobra el profesional</option>`
+      : `<option value="ummana">Cobra Ummana</option><option value="profesional">Cobra el profesional</option>`;
+    selQuien.value = soloProfesional ? 'profesional' : (valor==='profesional' ? 'profesional' : 'ummana');
+  }
+  function sincronizarQuienSegunMedio(inicial){
     if(selMedio.value === 'debe'){
-      selQuien.value = 'ummana';
+      opcionesQuien(false, 'ummana');
       selQuien.disabled = true;
+      return;
+    }
+    selQuien.disabled = false;
+    if(selMedio.value === 'transferencia' && !(inicial && legadoTransfUmmana)){
+      opcionesQuien(true);
     } else {
-      selQuien.disabled = false;
+      opcionesQuien(false, inicial ? cobradoPor : 'ummana');
     }
   }
-  selMedio.addEventListener('change', sincronizarQuienSegunMedio);
-  sincronizarQuienSegunMedio();
+  selMedio.addEventListener('change', ()=> sincronizarQuienSegunMedio(false));
+  sincronizarQuienSegunMedio(true);
   row.querySelector('.btn-quitar').onclick = ()=> row.remove();
   document.getElementById('pagosLista').appendChild(row);
 }
