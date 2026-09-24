@@ -199,6 +199,10 @@
   td.total.egreso{color:#a13a3a;}
   tbody tr:hover td{filter:brightness(0.98);}
   /* Tabla principal: columnas fijas, el texto largo baja de renglón en vez de ensanchar la columna */
+  .btn-wa{display:inline-flex;align-items:center;gap:7px;background:#25a35a;border-color:#25a35a;color:#fff;}
+  .btn-wa:hover{background:#1e8a4b;}
+  .btn-wa:disabled{opacity:.6;}
+  .wa-nota{margin-right:auto;align-self:center;font-size:11.5px;font-weight:600;color:#1e7a44;max-width:420px;line-height:1.35;}
   .fecha-bloqueada{background:#f1ece0 !important;color:var(--muted) !important;cursor:not-allowed;}
   .tabla-mov{table-layout:fixed;width:100%;min-width:1180px;}
   .tabla-mov td{white-space:normal;overflow-wrap:break-word;padding-top:2px;padding-bottom:2px;line-height:1.15;}
@@ -756,7 +760,12 @@
       <img id="imgPreviewPNG" style="width:100%;display:none;">
     </div>
     <div class="modal-actions">
+      <span class="wa-nota col-hidden" id="waNota"></span>
       <button class="btn" id="cancelPreviewPDF">Cerrar</button>
+      <button class="btn btn-wa col-hidden" id="whatsappPreview">
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.9 9.9 0 0 0 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91A9.84 9.84 0 0 0 12.04 2Zm0 18.15h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.22 8.22 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.25-8.24 2.2 0 4.27.86 5.83 2.42a8.18 8.18 0 0 1 2.41 5.83c0 4.54-3.7 8.23-8.24 8.23Zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.12-.16.25-.64.81-.78.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.38.11-.5.11-.11.25-.29.37-.43.13-.15.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.43.06-.66.31-.23.25-.87.85-.87 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.14-1.18-.06-.1-.22-.16-.47-.28Z"/></svg>
+        Enviar por WhatsApp
+      </button>
       <button class="btn btn-primary" id="descargarPreviewPDF">Descargar</button>
     </div>
   </div>
@@ -2262,14 +2271,19 @@ function cerrarOtrosOverlays(idExcluido){
 
 function mostrarPreviewPDF(doc, filename){
   pdfListoParaDescargar = {tipo:'pdf', doc, filename};
+  document.getElementById('whatsappPreview').classList.add('col-hidden');
+  document.getElementById('waNota').classList.add('col-hidden');
   document.getElementById('iframePreviewPDF').style.display = 'block';
   document.getElementById('imgPreviewPNG').style.display = 'none';
   document.getElementById('iframePreviewPDF').src = doc.output('bloburl');
   cerrarOtrosOverlays('overlayPreviewPDF');
   overlayPreviewPDF.classList.add('show');
 }
-function mostrarPreviewPNG(dataUrl, filename){
-  pdfListoParaDescargar = {tipo:'png', dataUrl, filename};
+function mostrarPreviewPNG(dataUrl, filename, whatsapp){
+  pdfListoParaDescargar = {tipo:'png', dataUrl, filename, whatsapp: whatsapp||null, blob:null};
+  fetch(dataUrl).then(r=>r.blob()).then(b=>{ if(pdfListoParaDescargar && pdfListoParaDescargar.dataUrl===dataUrl) pdfListoParaDescargar.blob = b; });
+  document.getElementById('whatsappPreview').classList.toggle('col-hidden', !whatsapp);
+  document.getElementById('waNota').classList.add('col-hidden');
   document.getElementById('imgPreviewPNG').style.display = 'block';
   document.getElementById('iframePreviewPDF').style.display = 'none';
   document.getElementById('imgPreviewPNG').src = dataUrl;
@@ -2278,6 +2292,67 @@ function mostrarPreviewPNG(dataUrl, filename){
 }
 document.getElementById('closePreviewPDF').onclick = ()=> overlayPreviewPDF.classList.remove('show');
 document.getElementById('cancelPreviewPDF').onclick = ()=> overlayPreviewPDF.classList.remove('show');
+/* ---------- Enviar pago profesional por WhatsApp ---------- */
+// Normaliza un teléfono argentino al formato de wa.me (549 + área + número)
+function telWhatsApp(tel){
+  let d = String(tel||'').replace(/\D/g,'');
+  if(!d) return '';
+  if(d.startsWith('00')) d = d.slice(2);
+  if(d.startsWith('54')){ d = d.slice(2); if(d.startsWith('9')) d = d.slice(1); }
+  if(d.startsWith('0')) d = d.slice(1);
+  // quita el "15" después del código de área (ej. 11 15 2345 6789)
+  const m = d.match(/^(11|[2368]\d{1,3})15(\d{6,8})$/);
+  if(m && (m[1]+m[2]).length===10) d = m[1]+m[2];
+  return '549' + d;
+}
+function telefonoDeProfesional(nombre){
+  const p = profesionalesFullList.find(x=> x.nombre === nombre);
+  return p ? (p.telefono||'') : '';
+}
+function mostrarNotaWA(txt){
+  const n = document.getElementById('waNota');
+  n.textContent = txt; n.classList.remove('col-hidden');
+}
+document.getElementById('whatsappPreview').onclick = async ()=>{
+  const info = pdfListoParaDescargar;
+  if(!info || !info.whatsapp) return;
+  const {prof, texto} = info.whatsapp;
+  const numero = telWhatsApp(telefonoDeProfesional(prof));
+  if(!numero){
+    alert(`${prof} no tiene un teléfono cargado.\nAgregalo en Menú → Profesionales/Áreas y volvé a intentar.`);
+    return;
+  }
+  const blob = info.blob || await (await fetch(info.dataUrl)).blob();
+  const file = new File([blob], info.filename, {type:'image/png'});
+  const esCelular = window.matchMedia('(pointer:coarse)').matches;
+
+  // En el celular: menú de compartir del sistema (elegís WhatsApp y el chat)
+  if(esCelular && navigator.canShare && navigator.canShare({files:[file]})){
+    try{
+      await navigator.share({files:[file], text: texto});
+      return;
+    }catch(e){
+      if(e.name === 'AbortError') return;
+    }
+  }
+
+  // En la compu: copiamos la imagen y abrimos el chat del profesional
+  let copiada = false;
+  try{
+    await navigator.clipboard.write([new ClipboardItem({'image/png': blob})]);
+    copiada = true;
+  }catch(e){ console.warn('No se pudo copiar la imagen', e); }
+  if(!copiada){
+    const a = document.createElement('a');
+    a.href = info.dataUrl; a.download = info.filename; a.click();
+  }
+  window.open(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`, '_blank');
+  const atajo = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘+V' : 'Ctrl+V';
+  mostrarNotaWA(copiada
+    ? `✓ Imagen copiada. En el chat de WhatsApp pegala con ${atajo} y enviala.`
+    : `✓ Imagen descargada. Adjuntala en el chat de WhatsApp que se abrió.`);
+};
+
 document.getElementById('descargarPreviewPDF').onclick = ()=>{
   if(!pdfListoParaDescargar) return;
   if(pdfListoParaDescargar.tipo==='pdf'){
@@ -2605,7 +2680,9 @@ async function generarPNGPagoProfesional(prof, fechaISO, movs){
   const el = document.getElementById('pagoVisualHidden');
   const canvas = await html2canvas(el, {scale:2, backgroundColor:'#f8f3e8', useCORS:true});
   const dataUrl = canvas.toDataURL('image/png');
-  mostrarPreviewPNG(dataUrl, `pago-${prof.replace(/[^a-z0-9]+/gi,'-')}-${fechaISO}.png`);
+  const aPagar = `$${ummPesos.toLocaleString('es-AR')}${ummUsd?' y US$ '+ummUsd.toLocaleString('es-AR'):''}`;
+  const texto = `Hola! Te paso el detalle de tu pago del ${isoToDisplay(fechaISO)}. Total a pagar: ${aPagar}.`;
+  mostrarPreviewPNG(dataUrl, `pago-${prof.replace(/[^a-z0-9]+/gi,'-')}-${fechaISO}.png`, {prof, texto});
 }
 
 /* =====================================================================
@@ -3320,7 +3397,7 @@ buscarProfesionalInput.addEventListener('input', renderProfesionalesBusqueda);
 // (por ejemplo, recién importado desde el CSV de conceptos).
 function listaProfesionalesCombinada(){
   const porNombre = {};
-  profesionalesFullList.forEach(p=> porNombre[p.nombre] = {id:p.id, nombre:p.nombre});
+  profesionalesFullList.forEach(p=> porNombre[p.nombre] = {id:p.id, nombre:p.nombre, telefono:p.telefono||''});
   Object.keys(CONCEPTOS).forEach(nombre=>{
     if(!porNombre[nombre]) porNombre[nombre] = {id:null, nombre};
   });
@@ -3331,6 +3408,7 @@ function filaProfesionalHTML(p, esNueva){
   return `
     <div class="fila-editable" data-nombre="${p.nombre||''}" data-id="${p.id||''}">
       <input type="text" class="col pf-nombre" value="${p.nombre||''}" placeholder="Nombre del profesional/área">
+      <input type="tel" class="col-chico pf-telefono" style="flex:0 0 150px;" value="${p.telefono||''}" placeholder="WhatsApp (ej. 11 2345 6789)">
       <button class="btn-guardar-fila" onclick="${esNueva ? 'crearProfesionalFila(this)' : 'guardarProfesionalFila(this)'}">${esNueva ? "Crear" : "Guardar"}</button>
       ${esNueva ? "" : `<button class="btn-eliminar-fila" onclick="eliminarProfesionalFila('${p.id||''}', '${p.nombre}', this)" title="Eliminar">✕</button>`}
     </div>
@@ -3349,10 +3427,11 @@ function renderProfesionalesBusqueda(){
 async function crearProfesionalFila(btn){
   const fila = btn.closest('.fila-editable');
   const nombre = fila.querySelector('.pf-nombre').value.trim();
+  const telefono = fila.querySelector('.pf-telefono').value.trim();
   if(!nombre){ alert("El nombre no puede quedar vacío."); return; }
   btn.disabled = true; btn.textContent = "Creando…";
   try{
-    await db.collection('profesionales').add({nombre});
+    await db.collection('profesionales').add({nombre, telefono});
     mostrarNuevoProfesional = false;
   }catch(e){
     alert("No se pudo crear: " + e.message);
@@ -3365,14 +3444,15 @@ async function guardarProfesionalFila(btn){
   const fila = btn.closest('.fila-editable');
   const id = fila.dataset.id;
   const nombre = fila.querySelector('.pf-nombre').value.trim();
+  const telefono = fila.querySelector('.pf-telefono').value.trim();
   if(!nombre){ alert("El nombre no puede quedar vacío."); return; }
   const txtOriginal = btn.textContent;
   btn.disabled = true; btn.textContent = "Guardando…";
   try{
     if(id){
-      await db.collection('profesionales').doc(id).update({nombre});
+      await db.collection('profesionales').doc(id).update({nombre, telefono});
     } else {
-      await db.collection('profesionales').add({nombre});
+      await db.collection('profesionales').add({nombre, telefono});
     }
     btn.textContent = "¡Guardado!";
     setTimeout(()=>{ btn.textContent = txtOriginal; btn.disabled = false; }, 1200);
