@@ -837,7 +837,7 @@
     <div class="modal-sub">La misma persona que abre es la que cierra.</div>
     <div class="field">
       <label>Nombre</label>
-      <input type="text" id="ecNombre" placeholder="Nombre de la recepcionista">
+      <input type="text" id="ecNombre" data-no-mayus placeholder="Nombre de la recepcionista">
     </div>
     <div class="field">
       <label>Fecha</label>
@@ -991,6 +991,15 @@
       </p>
       <div class="modal-sub" id="migrarPagosInfo" style="margin:0 0 10px;"></div>
       <button class="btn" id="btnMigrarPagos">Migrar movimientos al nuevo formato de pagos</button>
+    </div>
+
+    <div class="subcard">
+      <h3>Pasar todo a mayúsculas</h3>
+      <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">
+        Convierte a mayúsculas los datos ya cargados: movimientos (paciente, profesional, concepto, código y notas), pacientes, profesionales/áreas, conceptos y proveedores. No toca emails, teléfonos, montos, fechas ni usuarios. Se hace una sola vez.
+      </p>
+      <div class="modal-sub" id="mayusInfo" style="margin:0 0 10px;"></div>
+      <button class="btn" id="btnMigrarMayus">Pasar datos existentes a mayúsculas</button>
     </div>
 
     <div class="modal-actions">
@@ -1236,6 +1245,35 @@ document.getElementById('btnVistaPreviaGate').onclick = toggleVistaPrevia;
 // Mientras se guarda una fila de un panel, no se redibuja la lista desde Firestore:
 // si no, la fila se reemplaza en medio del guardado (se pierde el "¡Guardado!", el
 // scroll salta y se borran cambios sin guardar de otras filas).
+/* ---------- Todo en MAYÚSCULAS ---------- */
+const mayus = v => typeof v === 'string' ? v.toLocaleUpperCase('es-AR') : v;
+// Campos de texto que se guardan siempre en mayúsculas, por colección
+const CAMPOS_MAYUS = {
+  movimientos:   ['pac','prof','concepto','codigo','notas'],
+  pacientes:     ['apellido','nombre','nombreCompleto','medioLlegada'],
+  profesionales: ['nombre'],
+  conceptos:     ['profesional','concepto','codigo'],
+  proveedores:   ['nombre'],
+};
+function mayusDoc(coleccion, dato){
+  const out = {...dato};
+  (CAMPOS_MAYUS[coleccion]||[]).forEach(k=>{ if(typeof out[k]==='string') out[k] = mayus(out[k]); });
+  return out;
+}
+// Todo lo que se escribe en un campo de texto pasa a mayúsculas al instante
+// (excepto login, emails, contraseñas, fechas, teléfonos, números y campos marcados data-no-mayus).
+document.addEventListener('input', (e)=>{
+  const el = e.target;
+  if(!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) return;
+  if(el instanceof HTMLInputElement && !['text','search',''].includes((el.getAttribute('type')||'').toLowerCase())) return;
+  if(el.hasAttribute('data-no-mayus') || el.closest('#loginScreen, .login-card')) return;
+  const v = el.value, up = mayus(v);
+  if(v === up) return;
+  const a = el.selectionStart, b = el.selectionEnd;
+  el.value = up;
+  try{ el.setSelectionRange(a, b); }catch(_){}
+}, true);
+
 let pausaRenderPaneles = 0;
 function conPausaRender(fn){
   return async function(...args){
@@ -2772,10 +2810,45 @@ document.getElementById('btnImportar').onclick = ()=>{
   impConceptosRows = [];
   overlayImportar.classList.add('show');
 };
+document.getElementById('btnMigrarMayus').onclick = async ()=>{
+  if(!esFede()) return;
+  if(!confirm("Se van a pasar a mayúsculas todos los datos ya cargados (movimientos, pacientes, profesionales, conceptos y proveedores). ¿Continuar?")) return;
+  const btn = document.getElementById('btnMigrarMayus');
+  const info = document.getElementById('mayusInfo');
+  btn.disabled = true;
+  const resumen = [];
+  try{
+    for(const col of Object.keys(CAMPOS_MAYUS)){
+      info.textContent = `Revisando ${col}…`;
+      const snap = await db.collection(col).get();
+      const cambios = [];
+      snap.docs.forEach(d=>{
+        const dato = d.data(), upd = {};
+        CAMPOS_MAYUS[col].forEach(k=>{
+          if(typeof dato[k]==='string' && dato[k] !== mayus(dato[k])) upd[k] = mayus(dato[k]);
+        });
+        if(Object.keys(upd).length) cambios.push([d.ref, upd]);
+      });
+      for(let i=0; i<cambios.length; i+=400){
+        const lote = db.batch();
+        cambios.slice(i, i+400).forEach(([ref, upd])=> lote.update(ref, upd));
+        await lote.commit();
+        info.textContent = `Actualizando ${col}… ${Math.min(i+400, cambios.length)}/${cambios.length}`;
+      }
+      resumen.push(`${col}: ${cambios.length}`);
+    }
+    info.textContent = `¡Listo! Registros actualizados → ${resumen.join(' · ')}.`;
+  }catch(e){
+    info.textContent = `Se cortó con un error: ${e.message}. Podés volver a tocar el botón: sigue desde donde quedó.`;
+  }
+  btn.disabled = false;
+};
+
 document.getElementById('closeImportar').onclick = ()=> overlayImportar.classList.remove('show');
 document.getElementById('cerrarImportar').onclick = ()=> overlayImportar.classList.remove('show');
 
 async function importarEnLotes(coleccion, filas){
+  filas = filas.map(f=> mayusDoc(coleccion, f));
   const CHUNK = 400;
   for(let i=0; i<filas.length; i+=CHUNK){
     const lote = db.batch();
@@ -3369,7 +3442,7 @@ document.getElementById('inpImportarProveedores').addEventListener('change', asy
     const existentes = new Set(proveedoresFullList.map(p=>p.nombre));
     let creados = 0, ignorados = 0;
     for(const fila of filas){
-      const nombre = (fila["Proveedor/Destinatario"] || fila["Proveedor"] || fila["Nombre"] || "").toString().trim();
+      const nombre = mayus((fila["Proveedor/Destinatario"] || fila["Proveedor"] || fila["Nombre"] || "").toString().trim());
       if(!nombre || existentes.has(nombre)){ ignorados++; continue; }
       await db.collection('proveedores').add({nombre});
       existentes.add(nombre);
@@ -3520,7 +3593,7 @@ document.getElementById('inpImportarProfesionales').addEventListener('change', a
     profesionalesFullList.forEach(p=> existentesPorNombre[p.nombre] = p.id);
     let creados = 0, actualizados = 0;
     for(const fila of filas){
-      const nombre = (fila["Profesional/Área"] || fila["Profesional/Area"] || fila["Nombre"] || "").toString().trim();
+      const nombre = mayus((fila["Profesional/Área"] || fila["Profesional/Area"] || fila["Nombre"] || "").toString().trim());
       if(!nombre) continue;
       if(existentesPorNombre[nombre]){
         await db.collection('profesionales').doc(existentesPorNombre[nombre]).update({nombre});
@@ -3688,9 +3761,9 @@ document.getElementById('inpImportarConceptos').addEventListener('change', async
     const filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
     let creados = 0, ignorados = 0;
     for(const fila of filas){
-      const profesional = (fila["Área"] || fila["Area"] || fila["Profesional"] || "").toString().trim();
-      const codigo = (fila["Código"] || fila["Codigo"] || "").toString().trim();
-      const concepto = (fila["Concepto"] || "").toString().trim();
+      const profesional = mayus((fila["Área"] || fila["Area"] || fila["Profesional"] || "").toString().trim());
+      const codigo = mayus((fila["Código"] || fila["Codigo"] || "").toString().trim());
+      const concepto = mayus((fila["Concepto"] || "").toString().trim());
       const tipoTxt = (fila["Tipo"] || "").toString().trim().toLowerCase();
       const tipo = tipoTxt.startsWith("egr") ? "egreso" : "ingreso";
       if(!profesional || !concepto){ ignorados++; continue; }
