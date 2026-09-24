@@ -994,12 +994,12 @@
     </div>
 
     <div class="subcard">
-      <h3>Pasar todo a mayúsculas</h3>
+      <h3>Pasar todo a mayúsculas y sin tildes</h3>
       <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">
-        Convierte a mayúsculas los datos ya cargados: movimientos (paciente, profesional, concepto, código y notas), pacientes, profesionales/áreas, conceptos y proveedores. No toca emails, teléfonos, montos, fechas ni usuarios. Se hace una sola vez.
+        Convierte a mayúsculas y quita las tildes de las vocales (la Ñ se mantiene) en los datos ya cargados: movimientos (paciente, profesional, concepto, código y notas), pacientes, profesionales/áreas, conceptos y proveedores. No toca emails, teléfonos, montos, fechas ni usuarios. Se hace una sola vez.
       </p>
       <div class="modal-sub" id="mayusInfo" style="margin:0 0 10px;"></div>
-      <button class="btn" id="btnMigrarMayus">Pasar datos existentes a mayúsculas</button>
+      <button class="btn" id="btnMigrarMayus">Pasar datos existentes a mayúsculas y sin tildes</button>
     </div>
 
     <div class="modal-actions">
@@ -1246,7 +1246,13 @@ document.getElementById('btnVistaPreviaGate').onclick = toggleVistaPrevia;
 // si no, la fila se reemplaza en medio del guardado (se pierde el "¡Guardado!", el
 // scroll salta y se borran cambios sin guardar de otras filas).
 /* ---------- Todo en MAYÚSCULAS ---------- */
-const mayus = v => typeof v === 'string' ? v.toLocaleUpperCase('es-AR') : v;
+// Mayúsculas y vocales sin tilde (Á→A, É→E, Í→I, Ó→O, Ú→U). La Ñ queda como está.
+const SIN_TILDE = {'Á':'A','É':'E','Í':'I','Ó':'O','Ú':'U'};
+const mayus = v => typeof v === 'string'
+  ? v.toLocaleUpperCase('es-AR').replace(/[ÁÉÍÓÚ]/g, c=> SIN_TILDE[c])
+  : v;
+// Para comparar en buscadores sin importar mayúsculas ni tildes
+const normBusqueda = v => (v||"").toString().toLowerCase().normalize('NFD').replace(/[\u0301]/g,'').normalize('NFC');
 // Campos de texto que se guardan siempre en mayúsculas, por colección
 const CAMPOS_MAYUS = {
   movimientos:   ['pac','prof','concepto','codigo','notas'],
@@ -1488,8 +1494,8 @@ function attachAutocomplete(input, getOptions, onPick){
 
   function renderList(){
     if(suppressOpen){ suppressOpen = false; return; }
-    const q = input.value.trim().toLowerCase();
-    opcionesActuales = getOptions().filter(o=> !q || o.toLowerCase().includes(q)).slice(0,40);
+    const q = normBusqueda(input.value.trim());
+    opcionesActuales = getOptions().filter(o=> !q || normBusqueda(o).includes(q)).slice(0,40);
     indiceActivo = -1;
     dd.innerHTML = opcionesActuales.length
       ? opcionesActuales.map(o=>`<div class="ac-option">${o}</div>`).join('')
@@ -1547,7 +1553,7 @@ const filtroCobro = document.getElementById('filtroCobro');
 const filtrosTabla = [filtroFecha, filtroPaciente, filtroProfesional, filtroCodigo, filtroConcepto, filtroNotas, filtroTotal, filtroMedio, filtroCobro];
 filtrosTabla.forEach(f=> f.addEventListener('input', renderTabla));
 
-function contiene(campo, texto){ return (campo||"").toLowerCase().includes(texto.trim().toLowerCase()); }
+function contiene(campo, texto){ return normBusqueda(campo).includes(normBusqueda(texto.trim())); }
 
 function pasaFiltros(m){
   if(filtroFecha.value && !contiene(m.fechaDisplay, filtroFecha.value)) return false;
@@ -2871,7 +2877,7 @@ document.getElementById('btnImportar').onclick = ()=>{
 };
 document.getElementById('btnMigrarMayus').onclick = async ()=>{
   if(!esFede()) return;
-  if(!confirm("Se van a pasar a mayúsculas todos los datos ya cargados (movimientos, pacientes, profesionales, conceptos y proveedores). ¿Continuar?")) return;
+  if(!confirm("Se van a pasar a mayúsculas y sin tildes todos los datos ya cargados (movimientos, pacientes, profesionales, conceptos y proveedores). ¿Continuar?")) return;
   const btn = document.getElementById('btnMigrarMayus');
   const info = document.getElementById('mayusInfo');
   btn.disabled = true;
@@ -3309,10 +3315,10 @@ function filaPacienteHTML(p, esNueva){
 }
 
 function renderPacientesBusqueda(){
-  const q = buscarPacienteInput.value.trim().toLowerCase();
+  const q = normBusqueda(buscarPacienteInput.value.trim());
   const cont = document.getElementById('pacientesScroll');
   const filtrados = q
-    ? pacientesFullList.filter(p=> (p.apellido||"").toLowerCase().includes(q) || (p.nombre||"").toLowerCase().includes(q))
+    ? pacientesFullList.filter(p=> normBusqueda(p.apellido||"").includes(q) || normBusqueda(p.nombre||"").includes(q))
     : pacientesFullList;
   const nuevaFila = mostrarNuevoPaciente ? filaPacienteHTML({}, true) : "";
   if(!filtrados.length && !nuevaFila){ cont.innerHTML = '<div class="empty-state">No encontré pacientes con ese nombre.</div>'; return; }
@@ -3414,9 +3420,9 @@ function filaProveedorHTML(p, esNueva){
 }
 
 function renderProveedoresBusqueda(){
-  const q = buscarProveedorInput.value.trim().toLowerCase();
+  const q = normBusqueda(buscarProveedorInput.value.trim());
   const cont = document.getElementById('proveedoresScroll');
-  const filtrados = q ? proveedoresFullList.filter(p=> (p.nombre||"").toLowerCase().includes(q)) : proveedoresFullList;
+  const filtrados = q ? proveedoresFullList.filter(p=> normBusqueda(p.nombre||"").includes(q)) : proveedoresFullList;
   const nuevaFila = mostrarNuevoProveedorPanel ? filaProveedorHTML({}, true) : "";
   if(!filtrados.length && !nuevaFila){ cont.innerHTML = '<div class="empty-state">No encontré proveedores con ese nombre.</div>'; return; }
   cont.innerHTML = nuevaFila + filtrados.map(p=> filaProveedorHTML(p, false)).join('');
@@ -3544,9 +3550,9 @@ function filaProfesionalHTML(p, esNueva){
 }
 
 function renderProfesionalesBusqueda(){
-  const q = buscarProfesionalInput.value.trim().toLowerCase();
+  const q = normBusqueda(buscarProfesionalInput.value.trim());
   const cont = document.getElementById('profesionalesScroll');
-  const lista = listaProfesionalesCombinada().filter(p=> !q || p.nombre.toLowerCase().includes(q));
+  const lista = listaProfesionalesCombinada().filter(p=> !q || normBusqueda(p.nombre).includes(q));
   const nuevaFila = mostrarNuevoProfesional ? filaProfesionalHTML({}, true) : "";
   if(!lista.length && !nuevaFila){ cont.innerHTML = '<div class="empty-state">No encontré profesionales/área con ese nombre.</div>'; return; }
   cont.innerHTML = nuevaFila + lista.map(p=> filaProfesionalHTML(p, false)).join('');
@@ -3703,10 +3709,10 @@ function filaConceptoHTML(c, esNueva){
 }
 
 function renderConceptosBusqueda(){
-  const q = buscarConceptoInput.value.trim().toLowerCase();
+  const q = normBusqueda(buscarConceptoInput.value.trim());
   const cont = document.getElementById('conceptosScroll');
   const lista = todosLosConceptos().filter(c=> !q ||
-    c.profesional.toLowerCase().includes(q) || c.concepto.toLowerCase().includes(q) || (c.codigo||"").toLowerCase().includes(q)
+    normBusqueda(c.profesional).includes(q) || normBusqueda(c.concepto).includes(q) || normBusqueda(c.codigo||"").includes(q)
   );
   const nuevaFila = mostrarNuevoConcepto ? filaConceptoHTML({profesional: todosLosNombresDeProfesionales()[0]||""}, true) : "";
   if(!lista.length && !nuevaFila){ cont.innerHTML = '<div class="empty-state">No encontré conceptos con esa búsqueda.</div>'; return; }
