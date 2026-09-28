@@ -262,6 +262,20 @@
   .s-total-egreso span{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;}
   .s-total-egreso strong{font-size:16px;color:#a13a3a;}
   .menu-links button.activo{background:#f4ecd6;}
+  .tabla-sueros td.monto.neg{color:#a13a3a;}
+  .s-cfg-btn{font-size:11.5px;padding:6px 12px;}
+  .s-reparto{margin-top:4px;border:1px solid var(--border);border-radius:10px;background:#f6f0de;padding:6px 14px;}
+  .s-rep-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:7px 0;border-bottom:1px dashed var(--border);}
+  .s-rep-row:last-child{border-bottom:none;}
+  .s-rep-row > span{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;}
+  .s-rep-row em{font-style:normal;font-weight:600;text-transform:none;letter-spacing:0;color:#b3a98e;margin-left:4px;}
+  .s-reparto .s-rep-row input[type=text]{width:150px;flex:none;text-align:right;font-weight:700;}
+  .s-rep-row > span{white-space:nowrap;}
+  .s-rep-row strong{font-size:13px;}
+  .s-rep-total strong{font-size:16px;color:#2f7a2f;}
+  .s-rep-total strong.neg{color:#a13a3a;}
+  .s-auto-btn{border:none;background:transparent;color:var(--accent);font-size:10.5px;font-weight:700;padding:0 0 0 6px;text-transform:none;letter-spacing:0;}
+  .s-auto-btn:hover{text-decoration:underline;}
   .fecha-bloqueada{background:#f1ece0 !important;color:var(--muted) !important;cursor:not-allowed;}
   .tabla-mov{table-layout:fixed;width:100%;min-width:1180px;}
   .tabla-mov td{white-space:normal;overflow-wrap:break-word;padding-top:2px;padding-bottom:2px;line-height:1.15;}
@@ -584,7 +598,7 @@
         <button class="s-tab s-tab-nuevo" id="sBtnNuevo">+ Nuevo mov.</button>
         <button class="s-tab" data-tab="resumen" role="tab">Resumen mensual</button>
       </div>
-      <div></div>
+      <div style="justify-self:end;"><button class="btn s-cfg-btn" id="sBtnCfg" title="Sabrina, descuento y % de Gabriela">⚙ Valores fijos</button></div>
     </div>
 
     <div class="s-panel" id="sPanelMovs">
@@ -947,6 +961,22 @@
         <label>Total</label>
         <input type="text" id="sTotalIngreso" inputmode="numeric" placeholder="$0">
       </div>
+      <div class="field">
+        <label>Insumos utilizados</label>
+        <div class="s-items-head"><span>Insumo</span><span>Cant.</span><span>Valor unit.</span><span style="text-align:right;">Total</span><span></span></div>
+        <div id="sItemsIng"></div>
+        <button type="button" class="btn s-add-item" id="sAddItemIng">+ Agregar insumo</button>
+      </div>
+      <div class="s-reparto">
+        <div class="s-rep-row"><span>Total insumos</span><strong id="sInsumosTotal">$0</strong></div>
+        <div class="s-rep-row"><span>Sabrina</span><input type="text" id="sSabrina" inputmode="numeric"></div>
+        <div class="s-rep-row">
+          <span>Gabriela <em id="sGabrielaModo">automático</em>
+            <button type="button" class="s-auto-btn col-hidden" id="sGabrielaAuto" title="Volver al cálculo automático">↺ automático</button></span>
+          <input type="text" id="sGabriela" inputmode="numeric">
+        </div>
+        <div class="s-rep-row s-rep-total"><span>Ummana</span><strong id="sUmmana">$0</strong></div>
+      </div>
     </div>
 
     <div id="sBloqueEgreso" class="col-hidden">
@@ -963,6 +993,24 @@
       <button class="btn btn-eliminar col-hidden" id="sEliminar" style="margin-right:auto;">Eliminar</button>
       <button class="btn" id="sCancelar">Cancelar</button>
       <button class="btn btn-primary" id="sGuardar">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: VALORES FIJOS DE SUEROS ============ -->
+<div class="overlay" id="overlaySueroCfg">
+  <div class="modal" style="max-width:420px;">
+    <button class="close-x" id="closeSueroCfg">✕</button>
+    <h2>Valores fijos</h2>
+    <div class="modal-sub">Se usan al cargar nuevas aplicaciones. Las ya cargadas no cambian.</div>
+    <div class="field"><label>Pago Sabrina</label><input type="text" id="cfgSabrina" inputmode="numeric"></div>
+    <div class="row2">
+      <div class="field"><label>Descuento fijo Gabriela</label><input type="text" id="cfgFijoGabriela" inputmode="numeric"></div>
+      <div class="field"><label>% Gabriela</label><input type="text" id="cfgPctGabriela" inputmode="decimal"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="cancelSueroCfg">Cancelar</button>
+      <button class="btn btn-primary" id="guardarSueroCfg">Guardar</button>
     </div>
   </div>
 </div>
@@ -1678,7 +1726,7 @@ function compareFechas(a,b){
   return (ma-mb) || (da-db_);
 }
 
-function attachAutocomplete(input, getOptions, onPick){
+function attachAutocomplete(input, getOptions, onPick, etiqueta){
   const wrap = input.closest('.ac-wrap');
   const dd = document.createElement('div');
   dd.className = 'ac-dropdown';
@@ -1700,7 +1748,7 @@ function attachAutocomplete(input, getOptions, onPick){
     opcionesActuales = getOptions().filter(o=> !q || normBusqueda(o).includes(q)).slice(0,40);
     indiceActivo = -1;
     dd.innerHTML = opcionesActuales.length
-      ? opcionesActuales.map(o=>`<div class="ac-option">${o}</div>`).join('')
+      ? opcionesActuales.map((o,i)=>`<div class="ac-option" data-i="${i}">${etiqueta ? etiqueta(o) : o}</div>`).join('')
       : '<div class="ac-empty">Sin resultados</div>';
     dd.classList.add('show');
   }
@@ -1737,7 +1785,7 @@ function attachAutocomplete(input, getOptions, onPick){
   dd.addEventListener('mousedown', (e)=>{
     const opt = e.target.closest('.ac-option');
     if(!opt) return;
-    elegir(opt.textContent);
+    elegir(opcionesActuales[Number(opt.dataset.i)]);
   });
   document.addEventListener('click', (e)=>{ if(!wrap.contains(e.target)) dd.classList.remove('show'); });
 }
@@ -3009,6 +3057,11 @@ let sueros = [];                 // todos los movimientos de sueros (ordenados p
 let vistaActual = 'movimientos';
 let sTabActual = 'movs';
 let mesSueros = { year: hoyRef.getFullYear(), month: hoyRef.getMonth()+1 };
+// Valores fijos del reparto (se editan desde "Valores fijos" y se guardan en sueros/_config)
+const SUEROS_CFG_DEFAULT = { sabrina: 50000, fijoGabriela: 27500, pctGabriela: 15 };
+let suerosCfg = {...SUEROS_CFG_DEFAULT};
+let unsubSuerosCfg = null;
+
 const fmtPesos = v => (v<0 ? '-' : '') + '$' + Math.abs(Math.round(v)).toLocaleString('es-AR');
 const parseMonto = v => Number(String(v||'').replace(/\D/g,'')) || 0;
 function formatearInputMonto(inp){
@@ -3023,15 +3076,25 @@ function sMesFin(){
 }
 function sEsMesActual(){ return mesSueros.year===hoyRef.getFullYear() && mesSueros.month===(hoyRef.getMonth()+1); }
 
-/* ---- Reparto de cada aplicación: Insumos / Sabrina / Gabriela / Ummana ----
-   PENDIENTE: fórmulas a definir. Mientras devuelva null, la columna se muestra como "—".  */
-function calcularRepartoSuero(m){
-  return { insumos:null, sabrina:null, gabriela:null, ummana:null };
+/* ---- Cálculo del reparto de una aplicación ----
+   Renta    = total paciente − costo insumos − Sabrina
+   Gabriela = (Renta − fijo) × % (si da negativo, 0). Se puede pisar a mano.
+   Ummana   = Renta − Gabriela (puede dar negativo)                         */
+function calcularGabrielaAuto(total, insumos, sabrina){
+  const base = (total - insumos - sabrina) - (Number(suerosCfg.fijoGabriela)||0);
+  return base > 0 ? Math.round(base * (Number(suerosCfg.pctGabriela)||0) / 100) : 0;
 }
-/* ---- Insumos que consume cada aplicación (para descontar del stock) ----
-   PENDIENTE: definir qué insumos y cuántos usa cada suero. Devuelve [{insumo, cant}]. */
+function calcularUmmana(total, insumos, sabrina, gabriela){
+  return total - insumos - sabrina - gabriela;
+}
+// Lo que se ve en las columnas: los valores guardados en cada aplicación
+function calcularRepartoSuero(m){
+  if(m.tipo==='egreso' || m.gabriela==null) return { insumos:null, sabrina:null, gabriela:null, ummana:null };
+  return { insumos: m.insumosTotal||0, sabrina: m.sabrina||0, gabriela: m.gabriela||0, ummana: m.ummana||0 };
+}
+// Insumos que consume cada aplicación (se descuentan del stock)
 function consumosDeIngreso(m){
-  return [];
+  return (m.items||[]).map(it=> ({insumo: it.insumo, cant: Number(it.cant)||0}));
 }
 
 function mostrarVista(v){
@@ -3049,15 +3112,19 @@ document.getElementById('btnSueros').onclick = ()=> mostrarVista('sueros');
 
 function suscribirSueros(){
   if(unsubSueros || !esFede()) return;
-  unsubSueros = db.collection('sueros').orderBy('fechaISO','asc').onSnapshot(snap=>{
+  const unsubMovs = db.collection('sueros').orderBy('fechaISO','asc').onSnapshot(snap=>{
     const ms = ts => ts && ts.toMillis ? ts.toMillis() : Date.now();
-    sueros = snap.docs.map(d=> ({id:d.id, ...d.data()}))
+    sueros = snap.docs.filter(d=> d.id!=='_config').map(d=> ({id:d.id, ...d.data()}))
       .sort((a,b)=> a.fechaISO===b.fechaISO ? ms(a.creadoEn)-ms(b.creadoEn) : (a.fechaISO<b.fechaISO?-1:1));
     renderSueros();
   }, err=>{
     document.getElementById('sTbody').innerHTML = `<tr><td colspan="9" style="padding:20px;text-align:left;color:#a13a3a;">
       No se pudieron cargar los movimientos de sueros: ${err.message}</td></tr>`;
   });
+  const unsubCfg = db.collection('sueros').doc('_config').onSnapshot(d=>{
+    suerosCfg = {...SUEROS_CFG_DEFAULT, ...(d.exists ? d.data() : {})};
+  }, ()=>{});
+  unsubSueros = ()=>{ unsubMovs(); unsubCfg(); };
 }
 
 /* ---- Mes y pestañas ---- */
@@ -3138,7 +3205,7 @@ function renderSuerosTabla(){
         <td class="monto">${celdaReparto(r.insumos)}</td>
         <td class="monto">${celdaReparto(r.sabrina)}</td>
         <td class="monto">${celdaReparto(r.gabriela)}</td>
-        <td class="monto">${celdaReparto(r.ummana)}</td>
+        <td class="monto ${r.ummana!=null && r.ummana<0 ? 'neg' : ''}">${celdaReparto(r.ummana)}</td>
       </tr>`;
   }).join('');
 }
@@ -3158,8 +3225,9 @@ function calcularStock(hastaISO){
       });
     } else {
       consumosDeIngreso(m).forEach(c=>{
+        if(!c.insumo) return;
         inv[c.insumo] = inv[c.insumo] || {cant:0, valorUnit:0};
-        inv[c.insumo].cant -= Number(c.cant)||0;
+        inv[c.insumo].cant -= c.cant;
       });
     }
   });
@@ -3212,7 +3280,7 @@ function renderResumenSueros(){
     return hay ? tot : null;
   };
   const total = ingresos.reduce((a,m)=> a+(Number(m.total)||0), 0);
-  const kpi = (lbl, v, cls='') => `<div class="s-kpi ${cls}"><div class="lbl">${lbl}</div><div class="val">${v==null ? '<span class="pend">—</span>' : fmtPesos(v)}</div></div>`;
+  const kpi = (lbl, v, cls='') => `<div class="s-kpi ${cls}"><div class="lbl">${lbl}</div><div class="val" ${v!=null && v<0 ? 'style="color:#a13a3a;"' : ''}>${v==null ? '<span class="pend">—</span>' : fmtPesos(v)}</div></div>`;
   document.getElementById('sResumen').innerHTML = `
     <h3>Resumen de ${MESES[mesSueros.month-1]} ${mesSueros.year}</h3>
     <div class="sub">Suma de los ingresos del mes.</div>
@@ -3229,13 +3297,48 @@ function renderResumenSueros(){
     </div>`;
 }
 
+/* ---- Valores fijos (Sabrina, descuento y % de Gabriela) ---- */
+const overlaySueroCfg = document.getElementById('overlaySueroCfg');
+document.getElementById('sBtnCfg').onclick = ()=>{
+  if(!esFede()) return;
+  document.getElementById('cfgSabrina').value = Number(suerosCfg.sabrina).toLocaleString('es-AR');
+  document.getElementById('cfgFijoGabriela').value = Number(suerosCfg.fijoGabriela).toLocaleString('es-AR');
+  document.getElementById('cfgPctGabriela').value = suerosCfg.pctGabriela;
+  overlaySueroCfg.classList.add('show');
+};
+['cfgSabrina','cfgFijoGabriela'].forEach(id=>{
+  const inp = document.getElementById(id);
+  inp.addEventListener('input', ()=> formatearInputMonto(inp));
+});
+const cerrarCfg = ()=> overlaySueroCfg.classList.remove('show');
+document.getElementById('closeSueroCfg').onclick = cerrarCfg;
+document.getElementById('cancelSueroCfg').onclick = cerrarCfg;
+document.getElementById('guardarSueroCfg').onclick = async ()=>{
+  if(!esFede()) return;
+  const pct = Number(String(document.getElementById('cfgPctGabriela').value).replace(',','.'));
+  if(isNaN(pct) || pct<0 || pct>100){ alert("El porcentaje tiene que estar entre 0 y 100."); return; }
+  const datos = {
+    sabrina: parseMonto(document.getElementById('cfgSabrina').value),
+    fijoGabriela: parseMonto(document.getElementById('cfgFijoGabriela').value),
+    pctGabriela: pct,
+  };
+  try{
+    await db.collection('sueros').doc('_config').set(datos);
+    suerosCfg = {...SUEROS_CFG_DEFAULT, ...datos};
+    cerrarCfg();
+  }catch(e){ alert("No se pudo guardar: " + e.message); }
+};
+
 /* ---- + Nuevo mov. (modal) ---- */
 const overlaySuero = document.getElementById('overlaySuero');
 const sTercero = document.getElementById('sTercero');
 const sDetalle = document.getElementById('sDetalle');
 const sTotalIngreso = document.getElementById('sTotalIngreso');
+const sSabrina = document.getElementById('sSabrina');
+const sGabriela = document.getElementById('sGabriela');
 let sEditId = null;
 let sTipo = 'ingreso';
+let sGabrielaManual = false;
 
 function conceptosSueroterapia(){
   const set = new Set();
@@ -3243,21 +3346,27 @@ function conceptosSueroterapia(){
     .forEach(k=> CONCEPTOS[k].forEach(c=> set.add(c.concepto)));
   return [...set].sort((a,b)=> a.localeCompare(b,'es'));
 }
-function insumosConocidos(){
-  const set = new Set();
-  sueros.forEach(m=> (m.items||[]).forEach(it=> it.insumo && set.add(it.insumo)));
-  return [...set].sort((a,b)=> a.localeCompare(b,'es'));
+// Insumos de la planilla Stock (nombre + valor unitario de la última compra)
+function insumosStock(){
+  return calcularStock('9999-12-31');
 }
-function ultimoPrecioInsumo(nombre){
-  for(let i=sueros.length-1; i>=0; i--){
-    const it = (sueros[i].items||[]).find(x=> x.insumo===nombre);
-    if(it && Number(it.valorUnit)) return Number(it.valorUnit);
-  }
-  return 0;
+function insumosConocidos(){ return insumosStock().map(i=> i.insumo); }
+function precioStock(nombre){
+  const i = insumosStock().find(x=> x.insumo===nombre);
+  return i ? i.valorUnit : 0;
 }
+const etiquetaInsumo = nombre => {
+  const i = insumosStock().find(x=> x.insumo===nombre);
+  return i && i.valorUnit
+    ? `${nombre} <span style="float:right;color:var(--muted);font-weight:600;">${fmtPesos(i.valorUnit)}</span>`
+    : nombre;
+};
 attachAutocomplete(sTercero, ()=> sTipo==='ingreso' ? pacienteRegistry : proveedoresRegistry);
 attachAutocomplete(sDetalle, conceptosSueroterapia);
-sTotalIngreso.addEventListener('input', ()=> formatearInputMonto(sTotalIngreso));
+sTotalIngreso.addEventListener('input', ()=>{ formatearInputMonto(sTotalIngreso); sRecalcular(); });
+sSabrina.addEventListener('input', ()=>{ formatearInputMonto(sSabrina); sRecalcular(); });
+sGabriela.addEventListener('input', ()=>{ formatearInputMonto(sGabriela); sGabrielaManual = true; sRecalcular(); });
+document.getElementById('sGabrielaAuto').onclick = ()=>{ sGabrielaManual = false; sRecalcular(); };
 
 function setTipoSuero(t, limpiar){
   sTipo = t;
@@ -3266,13 +3375,16 @@ function setTipoSuero(t, limpiar){
   document.getElementById('sBloqueIngreso').classList.toggle('col-hidden', t!=='ingreso');
   document.getElementById('sBloqueEgreso').classList.toggle('col-hidden', t!=='egreso');
   if(limpiar) sTercero.value = '';
-  if(t==='egreso' && !document.querySelector('#sItems .s-item')) sAgregarItem();
+  if(t==='egreso' && !document.querySelector('#sItems .s-item')) sAgregarItem(null, 'sItems');
+  if(t==='ingreso' && !document.querySelector('#sItemsIng .s-item')) sAgregarItem(null, 'sItemsIng');
+  sRecalcular();
 }
 document.querySelectorAll('#sTipo button').forEach(b=>{
   b.onclick = ()=>{ if(b.dataset.tipo!==sTipo) setTipoSuero(b.dataset.tipo, true); };
 });
 
-function sAgregarItem(it){
+// Fila de insumo (sirve para compras "sItems" y para insumos usados en una aplicación "sItemsIng")
+function sAgregarItem(it, contId){
   const row = document.createElement('div');
   row.className = 's-item';
   row.innerHTML = `
@@ -3281,7 +3393,7 @@ function sAgregarItem(it){
     <input type="text" class="si-vu" inputmode="numeric" placeholder="$0">
     <div class="s-sub">$0</div>
     <button type="button" class="btn-quitar" title="Quitar">✕</button>`;
-  document.getElementById('sItems').appendChild(row);
+  document.getElementById(contId).appendChild(row);
   const inIns = row.querySelector('.si-insumo'), inCant = row.querySelector('.si-cant'), inVu = row.querySelector('.si-vu');
   if(it){
     inIns.value = it.insumo||'';
@@ -3289,50 +3401,76 @@ function sAgregarItem(it){
     inVu.value = it.valorUnit ? Number(it.valorUnit).toLocaleString('es-AR') : '';
   }
   attachAutocomplete(inIns, insumosConocidos, (nombre)=>{
-    if(!inVu.value){
-      const p = ultimoPrecioInsumo(nombre);
-      if(p){ inVu.value = p.toLocaleString('es-AR'); sRecalcular(); }
-    }
-    inCant.focus();
-  });
+    const p = precioStock(nombre);
+    if(p && (contId==='sItemsIng' || !inVu.value)) inVu.value = p.toLocaleString('es-AR');
+    if(contId==='sItemsIng' && !inCant.value) inCant.value = '1';
+    sRecalcular();
+    inCant.focus(); inCant.select();
+  }, etiquetaInsumo);
   [inCant, inVu].forEach(inp=> inp.addEventListener('input', ()=>{ formatearInputMonto(inp); sRecalcular(); }));
   row.querySelector('.btn-quitar').onclick = ()=>{ row.remove(); sRecalcular(); };
   sRecalcular();
 }
-document.getElementById('sAddItem').onclick = ()=> sAgregarItem();
+document.getElementById('sAddItem').onclick = ()=> sAgregarItem(null, 'sItems');
+document.getElementById('sAddItemIng').onclick = ()=> sAgregarItem(null, 'sItemsIng');
 
-function sLeerItems(){
-  return [...document.querySelectorAll('#sItems .s-item')].map(r=>{
+function sLeerItems(contId){
+  return [...document.querySelectorAll(`#${contId} .s-item`)].map(r=>{
     const cant = parseMonto(r.querySelector('.si-cant').value);
     const valorUnit = parseMonto(r.querySelector('.si-vu').value);
     return { insumo: mayus(r.querySelector('.si-insumo').value.trim()), cant, valorUnit, subtotal: cant*valorUnit };
   });
 }
-function sRecalcular(){
+function sTotalItems(contId){
   let tot = 0;
-  document.querySelectorAll('#sItems .s-item').forEach(r=>{
+  document.querySelectorAll(`#${contId} .s-item`).forEach(r=>{
     const sub = parseMonto(r.querySelector('.si-cant').value) * parseMonto(r.querySelector('.si-vu').value);
     r.querySelector('.s-sub').textContent = fmtPesos(sub);
     tot += sub;
   });
-  document.getElementById('sTotalEgreso').textContent = fmtPesos(tot);
+  return tot;
+}
+function sRecalcular(){
+  document.getElementById('sTotalEgreso').textContent = fmtPesos(sTotalItems('sItems'));
+  // Reparto de la aplicación
+  const total = parseMonto(sTotalIngreso.value);
+  const insumos = sTotalItems('sItemsIng');
+  const sabrina = parseMonto(sSabrina.value);
+  if(!sGabrielaManual){
+    const g = calcularGabrielaAuto(total, insumos, sabrina);
+    sGabriela.value = g.toLocaleString('es-AR');
+  }
+  const gabriela = parseMonto(sGabriela.value);
+  const ummana = calcularUmmana(total, insumos, sabrina, gabriela);
+  document.getElementById('sInsumosTotal').textContent = fmtPesos(insumos);
+  const elU = document.getElementById('sUmmana');
+  elU.textContent = fmtPesos(ummana);
+  elU.classList.toggle('neg', ummana < 0);
+  document.getElementById('sGabrielaModo').textContent = sGabrielaManual ? 'manual' : 'automático';
+  document.getElementById('sGabrielaAuto').classList.toggle('col-hidden', !sGabrielaManual);
 }
 
 function abrirModalSuero(id){
   if(!esFede()) return;
   const m = id ? sueros.find(x=> x.id===id) : null;
+  const esIng = !m || m.tipo!=='egreso';
   sEditId = m ? m.id : null;
   document.getElementById('sueroTitulo').textContent = m ? 'Editar movimiento de sueros' : 'Nuevo movimiento de sueros';
   document.getElementById('sGuardar').textContent = m ? 'Guardar cambios' : 'Guardar';
   document.getElementById('sEliminar').classList.toggle('col-hidden', !m);
   document.getElementById('sItems').innerHTML = '';
+  document.getElementById('sItemsIng').innerHTML = '';
   document.getElementById('sFecha').value = m ? m.fechaISO : hoyISO();
   sTercero.value = m ? (m.tercero||'') : '';
-  sDetalle.value = m && m.tipo!=='egreso' ? (m.detalle||'') : '';
-  sTotalIngreso.value = m && m.tipo!=='egreso' && m.total ? Number(m.total).toLocaleString('es-AR') : '';
-  if(m && m.tipo==='egreso') (m.items||[]).forEach(it=> sAgregarItem(it));
-  setTipoSuero(m ? (m.tipo==='egreso' ? 'egreso' : 'ingreso') : 'ingreso', false);
-  sRecalcular();
+  sDetalle.value = m && esIng ? (m.detalle||'') : '';
+  sTotalIngreso.value = m && esIng && m.total ? Number(m.total).toLocaleString('es-AR') : '';
+  // Sabrina / Gabriela: en una aplicación ya cargada se respetan los valores guardados
+  const sab = m && esIng && m.sabrina!=null ? m.sabrina : suerosCfg.sabrina;
+  sSabrina.value = Number(sab).toLocaleString('es-AR');
+  sGabrielaManual = !!(m && esIng && m.gabrielaManual);
+  sGabriela.value = m && esIng && m.gabriela!=null ? Number(m.gabriela).toLocaleString('es-AR') : '';
+  if(m) (m.items||[]).forEach(it=> sAgregarItem(it, esIng ? 'sItemsIng' : 'sItems'));
+  setTipoSuero(esIng ? 'ingreso' : 'egreso', false);
   overlaySuero.classList.add('show');
 }
 window.abrirModalSuero = abrirModalSuero;
@@ -3356,11 +3494,21 @@ document.getElementById('sGuardar').onclick = async ()=>{
     }
     datos.detalle = mayus(sDetalle.value.trim());
     datos.total = parseMonto(sTotalIngreso.value);
-    datos.items = [];
     if(!datos.detalle){ alert("Completá el detalle."); return; }
     if(!datos.total){ alert("Completá el total."); return; }
+    const items = sLeerItems('sItemsIng').filter(it=> it.insumo || it.cant || it.valorUnit);
+    const enStock = new Set(insumosConocidos());
+    const noExiste = items.find(it=> !enStock.has(it.insumo));
+    if(noExiste){ alert(`"${noExiste.insumo || '(vacío)'}" no está en el stock. Elegí un insumo de la lista.`); return; }
+    if(items.some(it=> !it.cant)){ alert("Cada insumo necesita una cantidad."); return; }
+    datos.items = items;
+    datos.insumosTotal = items.reduce((a,it)=> a+it.subtotal, 0);
+    datos.sabrina = parseMonto(sSabrina.value);
+    datos.gabriela = parseMonto(sGabriela.value);
+    datos.gabrielaManual = sGabrielaManual;
+    datos.ummana = calcularUmmana(datos.total, datos.insumosTotal, datos.sabrina, datos.gabriela);
   } else {
-    const items = sLeerItems().filter(it=> it.insumo || it.cant || it.valorUnit);
+    const items = sLeerItems('sItems').filter(it=> it.insumo || it.cant || it.valorUnit);
     if(!items.length){ alert("Agregá al menos un insumo."); return; }
     if(items.some(it=> !it.insumo || !it.cant || !it.valorUnit)){ alert("Cada insumo necesita detalle, cantidad y valor unitario."); return; }
     if(!proveedoresRegistry.some(p=> mayus(p)===tercero)){
@@ -3371,6 +3519,7 @@ document.getElementById('sGuardar').onclick = async ()=>{
     datos.items = items;
     datos.total = items.reduce((a,it)=> a+it.subtotal, 0);
     datos.detalle = '';
+    datos.insumosTotal = null; datos.sabrina = null; datos.gabriela = null; datos.gabrielaManual = false; datos.ummana = null;
   }
 
   const btn = document.getElementById('sGuardar');
