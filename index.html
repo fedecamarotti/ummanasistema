@@ -264,6 +264,11 @@
   .menu-links button.activo{background:#f4ecd6;}
   .tabla-sueros td.monto.neg{color:#a13a3a;}
   .s-cfg-btn{font-size:11.5px;padding:6px 12px;}
+  .s-res-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px;}
+  .s-res-head .sub{margin-bottom:0;}
+  .s-res-rango{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .s-res-rango label{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;}
+  .s-res-rango input[type=date]{width:auto;padding:6px 9px;font-size:12px;}
   .s-reparto{margin-top:4px;border:1px solid var(--border);border-radius:10px;background:#f6f0de;padding:6px 14px;}
   .s-rep-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:7px 0;border-bottom:1px dashed var(--border);}
   .s-rep-row:last-child{border-bottom:none;}
@@ -595,7 +600,7 @@
       <div class="s-tabs" role="tablist" aria-label="Sueros">
         <button class="s-tab active" data-tab="movs" role="tab">Movimientos sueros</button>
         <button class="s-tab" data-tab="stock" role="tab">Stock</button>
-        <button class="s-tab" data-tab="resumen" role="tab">Resumen mensual</button>
+        <button class="s-tab" data-tab="resumen" role="tab">Resumen</button>
         <button class="s-tab s-tab-nuevo" id="sBtnNuevo">+ Nuevo mov.</button>
       </div>
       <div style="justify-self:end;"><button class="btn s-cfg-btn" id="sBtnCfg" title="Sabrina, descuento y % de Gabriela">⚙ Valores fijos</button></div>
@@ -3361,8 +3366,23 @@ document.getElementById('guardarInsumo').onclick = async ()=>{
 };
 
 /* ---- Pestaña 3: Resumen mensual ---- */
+// Rango del resumen: por defecto el mes elegido; se puede cambiar con Desde / Hasta
+let sResDesde = null, sResHasta = null, sResMesKey = null;
+function ultimoDiaMesISO(){
+  const y = mesSueros.year, m = mesSueros.month;
+  return `${y}-${String(m).padStart(2,'0')}-${String(new Date(y, m, 0).getDate()).padStart(2,'0')}`;
+}
+function fechaLarga(iso){ const [y,m,d] = iso.split('-'); return `${Number(d)}/${Number(m)}/${y}`; }
+function sResAlMes(){ sResDesde = sMesInicio(); sResHasta = ultimoDiaMesISO(); }
 function renderResumenSueros(){
-  const delMes = suerosDelMes();
+  const key = sMesInicio();
+  if(sResMesKey !== key || !sResDesde || !sResHasta){ sResMesKey = key; sResAlMes(); }
+  if(sResDesde > sResHasta){ const t = sResDesde; sResDesde = sResHasta; sResHasta = t; }
+  const esMesCompleto = sResDesde===sMesInicio() && sResHasta===ultimoDiaMesISO();
+  const titulo = esMesCompleto ? `Resumen de ${MESES[mesSueros.month-1]} ${mesSueros.year}`
+    : sResDesde===sResHasta ? `Resumen del ${fechaLarga(sResDesde)}`
+    : `Resumen del ${fechaLarga(sResDesde)} al ${fechaLarga(sResHasta)}`;
+  const delMes = sueros.filter(m=> m.tipo!=='ajuste' && m.fechaISO>=sResDesde && m.fechaISO<=sResHasta);
   const ingresos = delMes.filter(m=> m.tipo!=='egreso');
   const compras = delMes.filter(m=> m.tipo==='egreso');
   const suma = campo => {
@@ -3373,8 +3393,17 @@ function renderResumenSueros(){
   const total = ingresos.reduce((a,m)=> a+(Number(m.total)||0), 0);
   const kpi = (lbl, v, cls='') => `<div class="s-kpi ${cls}"><div class="lbl">${lbl}</div><div class="val" ${v!=null && v<0 ? 'style="color:#a13a3a;"' : ''}>${v==null ? '<span class="pend">—</span>' : fmtPesos(v)}</div></div>`;
   document.getElementById('sResumen').innerHTML = `
-    <h3>Resumen de ${MESES[mesSueros.month-1]} ${mesSueros.year}</h3>
-    <div class="sub">Suma de los ingresos del mes.</div>
+    <div class="s-res-head">
+      <div>
+        <h3>${titulo}</h3>
+        <div class="sub">Suma de los ingresos del período.</div>
+      </div>
+      <div class="s-res-rango">
+        <label>Desde <input type="date" id="sResDesde" value="${sResDesde}"></label>
+        <label>Hasta <input type="date" id="sResHasta" value="${sResHasta}"></label>
+        <button type="button" class="btn s-cfg-btn ${esMesCompleto ? 'col-hidden' : ''}" id="sResMes">Mes completo</button>
+      </div>
+    </div>
     <div class="s-kpis">
       ${kpi('Total', total, 'principal')}
       ${kpi('Insumos', suma('insumos'))}
@@ -3386,6 +3415,9 @@ function renderResumenSueros(){
       <div class="s-kpi"><div class="lbl">Aplicaciones</div><div class="val">${ingresos.length}</div></div>
       <div class="s-kpi"><div class="lbl">Compras de insumos</div><div class="val" style="color:#a13a3a;">${fmtPesos(compras.reduce((a,m)=> a+(Number(m.total)||0), 0))}</div></div>
     </div>`;
+  document.getElementById('sResDesde').onchange = e=>{ if(e.target.value){ sResDesde = e.target.value; renderResumenSueros(); } };
+  document.getElementById('sResHasta').onchange = e=>{ if(e.target.value){ sResHasta = e.target.value; renderResumenSueros(); } };
+  document.getElementById('sResMes').onclick = ()=>{ sResAlMes(); renderResumenSueros(); };
 }
 
 /* ---- Valores fijos (Sabrina, descuento y % de Gabriela) ---- */
