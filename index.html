@@ -3442,12 +3442,19 @@ function insumosStock(){
   return calcularStock('9999-12-31');
 }
 function insumosConocidos(){ return insumosStock().map(i=> i.insumo); }
+// Precio vigente a la fecha de la ficha: el de la última compra/ajuste hasta ese día inclusive
+function hastaFechaFicha(){
+  const f = document.getElementById('sFecha').value || hoyISO();
+  const d = new Date(f + 'T12:00:00'); d.setDate(d.getDate()+1);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
 function precioStock(nombre){
-  const i = insumosStock().find(x=> x.insumo===nombre);
+  const i = calcularStock(hastaFechaFicha()).find(x=> x.insumo===nombre)
+         || insumosStock().find(x=> x.insumo===nombre);
   return i ? i.valorUnit : 0;
 }
 const etiquetaInsumo = nombre => {
-  const i = insumosStock().find(x=> x.insumo===nombre);
+  const i = { valorUnit: precioStock(nombre) };
   return i && i.valorUnit
     ? `${nombre} <span style="float:right;color:var(--muted);font-weight:600;">${fmtPesos(i.valorUnit)}</span>`
     : nombre;
