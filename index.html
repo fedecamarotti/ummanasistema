@@ -637,13 +637,14 @@
       <div class="s-caption" id="sStockCaption"></div>
       <div class="sheet-wrap">
         <table class="tabla-stock">
-          <colgroup><col><col style="width:130px"><col style="width:140px"><col style="width:100px"></colgroup>
+          <colgroup><col><col style="width:130px"><col style="width:140px"><col style="width:100px"><col style="width:44px"></colgroup>
           <thead>
             <tr>
               <th><input type="text" class="th-search th-search-left" id="sfInsumoStock" placeholder="Insumo" autocomplete="off" style="padding-left:14px;"></th>
               <th><div class="th-search">Valor unitario</div></th>
               <th><div class="th-search">Total</div></th>
               <th><div class="th-search">Stock</div></th>
+              <th class="editcol"></th>
             </tr>
           </thead>
           <tbody id="sStockBody"></tbody>
@@ -1015,6 +1016,24 @@
     <div class="modal-actions">
       <button class="btn" id="cancelSueroCfg">Cancelar</button>
       <button class="btn btn-primary" id="guardarSueroCfg">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: EDITAR INSUMO (STOCK DE SUEROS) ============ -->
+<div class="overlay" id="overlayInsumo">
+  <div class="modal" style="max-width:440px;">
+    <button class="close-x" id="closeInsumo">✕</button>
+    <h2>Editar insumo</h2>
+    <div class="modal-sub">Los cambios de valor y stock quedan registrados como un ajuste con fecha de hoy.</div>
+    <div class="field"><label>Insumo</label><input type="text" id="eiNombre"></div>
+    <div class="row2">
+      <div class="field"><label>Valor unitario</label><input type="text" id="eiValor" inputmode="numeric"></div>
+      <div class="field"><label>Stock actual</label><input type="text" id="eiStock" inputmode="numeric"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="cancelInsumo">Cancelar</button>
+      <button class="btn btn-primary" id="guardarInsumo">Guardar</button>
     </div>
   </div>
 </div>
@@ -3166,7 +3185,7 @@ function renderSueros(){
 
 function suerosDelMes(){
   const ini = sMesInicio(), fin = sMesFin();
-  return sueros.filter(m=> m.fechaISO>=ini && m.fechaISO<fin);
+  return sueros.filter(m=> m.tipo!=='ajuste' && m.fechaISO>=ini && m.fechaISO<fin);
 }
 function detalleSuero(m){
   // En los egresos se muestra el detalle escrito; los insumos se ven solo al editar
@@ -3219,7 +3238,8 @@ function renderSuerosTabla(){
 function calcularStock(hastaISO){
   const inv = {};
   sueros.filter(m=> m.fechaISO < hastaISO).forEach(m=>{
-    if(m.tipo==='egreso'){
+    if(m.tipo==='egreso' || m.tipo==='ajuste'){
+      // compras suman; los ajustes suman o restan la diferencia y pueden fijar un nuevo valor unitario
       (m.items||[]).forEach(it=>{
         const k = it.insumo; if(!k) return;
         inv[k] = inv[k] || {cant:0, valorUnit:0};
@@ -3260,7 +3280,9 @@ function renderStock(){
       <td>${i.valorUnit ? fmtPesos(i.valorUnit) : '<span class="pend">—</span>'}</td>
       <td class="${i.total<0?'neg':''}">${fmtPesos(i.total)}</td>
       <td class="${i.cant<0?'neg':''}" style="font-weight:700;">${i.cant.toLocaleString('es-AR')}</td>
+      <td class="editcol"><button class="editbtn" title="Editar insumo" data-insumo="${i.insumo.replace(/"/g,'&quot;')}">&#9998;</button></td>
     </tr>`).join('');
+  body.querySelectorAll('.editbtn[data-insumo]').forEach(b=> b.onclick = ()=> abrirEdicionInsumo(b.dataset.insumo));
   const totVal = lista.reduce((a,i)=> a+i.total, 0);
   const totCant = lista.reduce((a,i)=> a+i.cant, 0);
   foot.innerHTML = `
@@ -3269,8 +3291,74 @@ function renderStock(){
       <td></td>
       <td>${fmtPesos(totVal)}</td>
       <td>${totCant.toLocaleString('es-AR')}</td>
+      <td></td>
     </tr>`;
 }
+
+/* ---- Editar un insumo del stock ---- */
+const overlayInsumo = document.getElementById('overlayInsumo');
+let eiOriginal = null;
+function abrirEdicionInsumo(nombre){
+  if(!esFede()) return;
+  const actual = insumosStock().find(i=> i.insumo===nombre);
+  if(!actual) return;
+  eiOriginal = actual;
+  document.getElementById('eiNombre').value = actual.insumo;
+  document.getElementById('eiValor').value = actual.valorUnit ? actual.valorUnit.toLocaleString('es-AR') : '';
+  document.getElementById('eiStock').value = actual.cant.toLocaleString('es-AR');
+  overlayInsumo.classList.add('show');
+}
+['eiValor','eiStock'].forEach(id=>{
+  const inp = document.getElementById(id);
+  inp.addEventListener('input', ()=> formatearInputMonto(inp));
+});
+const cerrarInsumo = ()=> overlayInsumo.classList.remove('show');
+document.getElementById('closeInsumo').onclick = cerrarInsumo;
+document.getElementById('cancelInsumo').onclick = cerrarInsumo;
+document.getElementById('guardarInsumo').onclick = async ()=>{
+  if(!esFede() || !eiOriginal) return;
+  const nuevoNombre = mayus(document.getElementById('eiNombre').value.trim());
+  const nuevoValor = parseMonto(document.getElementById('eiValor').value);
+  const nuevoStock = parseMonto(document.getElementById('eiStock').value);
+  if(!nuevoNombre){ alert("El nombre no puede quedar vacío."); return; }
+  const renombrar = nuevoNombre !== eiOriginal.insumo;
+  if(renombrar && insumosConocidos().includes(nuevoNombre)){
+    alert(`Ya existe un insumo llamado "${nuevoNombre}".`); return;
+  }
+  const deltaStock = nuevoStock - eiOriginal.cant;
+  const cambiaValor = nuevoValor && nuevoValor !== eiOriginal.valorUnit;
+  if(!renombrar && !deltaStock && !cambiaValor){ cerrarInsumo(); return; }
+
+  const btn = document.getElementById('guardarInsumo');
+  btn.disabled = true; btn.textContent = "Guardando…";
+  try{
+    // 1) Renombrar en todas las compras, aplicaciones y ajustes donde aparece
+    if(renombrar){
+      const afectados = sueros.filter(m=> (m.items||[]).some(it=> it.insumo===eiOriginal.insumo));
+      for(let i=0; i<afectados.length; i+=400){
+        const lote = db.batch();
+        afectados.slice(i, i+400).forEach(m=>{
+          const items = m.items.map(it=> it.insumo===eiOriginal.insumo ? {...it, insumo: nuevoNombre} : it);
+          lote.update(db.collection('sueros').doc(m.id), {items});
+        });
+        await lote.commit();
+      }
+    }
+    // 2) Ajuste de stock y/o valor unitario (queda registrado con fecha de hoy)
+    if(deltaStock || cambiaValor){
+      await db.collection('sueros').add({
+        tipo: 'ajuste', fechaISO: hoyISO(), fechaDisplay: isoToDisplay(hoyISO()),
+        tercero: '', detalle: 'AJUSTE DE STOCK', total: 0,
+        items: [{ insumo: nuevoNombre, cant: deltaStock, valorUnit: cambiaValor ? nuevoValor : 0, subtotal: 0 }],
+        creadoPor: currentUser.nombre, creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    cerrarInsumo();
+  }catch(e){
+    alert("No se pudo guardar: " + e.message);
+  }
+  btn.disabled = false; btn.textContent = "Guardar";
+};
 
 /* ---- Pestaña 3: Resumen mensual ---- */
 function renderResumenSueros(){
