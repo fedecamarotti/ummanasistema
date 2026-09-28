@@ -981,6 +981,10 @@
 
     <div id="sBloqueEgreso" class="col-hidden">
       <div class="field">
+        <label>Detalle</label>
+        <input type="text" id="sDetalleEgreso" placeholder="Ej: Compra de insumos, reposición mensual…" autocomplete="off">
+      </div>
+      <div class="field">
         <label>Insumos comprados</label>
         <div class="s-items-head"><span>Detalle</span><span>Cant.</span><span>Valor unit.</span><span style="text-align:right;">Total</span><span></span></div>
         <div id="sItems"></div>
@@ -3165,9 +3169,8 @@ function suerosDelMes(){
   return sueros.filter(m=> m.fechaISO>=ini && m.fechaISO<fin);
 }
 function detalleSuero(m){
-  return m.tipo==='egreso'
-    ? (m.items||[]).map(it=> `${it.insumo} (${Number(it.cant).toLocaleString('es-AR')})`).join(', ')
-    : (m.detalle||'');
+  // En los egresos se muestra el detalle escrito; los insumos se ven solo al editar
+  return m.tipo==='egreso' ? (m.detalle || 'COMPRA DE INSUMOS') : (m.detalle||'');
 }
 const celdaReparto = v => v==null ? '<span class="pend">—</span>' : fmtPesos(v);
 
@@ -3463,6 +3466,7 @@ function abrirModalSuero(id){
   document.getElementById('sFecha').value = m ? m.fechaISO : hoyISO();
   sTercero.value = m ? (m.tercero||'') : '';
   sDetalle.value = m && esIng ? (m.detalle||'') : '';
+  document.getElementById('sDetalleEgreso').value = m && !esIng ? (m.detalle||'') : '';
   sTotalIngreso.value = m && esIng && m.total ? Number(m.total).toLocaleString('es-AR') : '';
   // Sabrina / Gabriela: en una aplicación ya cargada se respetan los valores guardados
   const sab = m && esIng && m.sabrina!=null ? m.sabrina : suerosCfg.sabrina;
@@ -3518,7 +3522,7 @@ document.getElementById('sGuardar').onclick = async ()=>{
     }
     datos.items = items;
     datos.total = items.reduce((a,it)=> a+it.subtotal, 0);
-    datos.detalle = '';
+    datos.detalle = mayus(document.getElementById('sDetalleEgreso').value.trim()) || 'COMPRA DE INSUMOS';
     datos.insumosTotal = null; datos.sabrina = null; datos.gabriela = null; datos.gabrielaManual = false; datos.ummana = null;
   }
 
