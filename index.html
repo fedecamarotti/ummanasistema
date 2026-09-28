@@ -3594,7 +3594,7 @@ document.getElementById('sGuardar').onclick = async ()=>{
     datos.detalle = mayus(sDetalle.value.trim());
     datos.total = parseMonto(sTotalIngreso.value);
     if(!datos.detalle){ alert("Completá el detalle."); return; }
-    if(!datos.total){ alert("Completá el total."); return; }
+    if(sTotalIngreso.value.trim()===''){ alert("Completá el total (si el paciente no pagó, poné 0)."); return; }
     const items = sLeerItems('sItemsIng').filter(it=> it.insumo || it.cant || it.valorUnit);
     const enStock = new Set(insumosConocidos());
     const noExiste = items.find(it=> !enStock.has(it.insumo));
